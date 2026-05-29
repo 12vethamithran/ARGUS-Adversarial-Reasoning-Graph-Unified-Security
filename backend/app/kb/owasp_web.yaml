@@ -1,0 +1,84 @@
+---
+# OWASP Web Application Security Top 10 — 2021
+# Used by L1 WebLayer for finding classification and remediation lookup
+version: "2021"
+source: "https://owasp.org/Top10/"
+
+categories:
+  - id: "A01:2021"
+    name: "Broken Access Control"
+    description: "Restrictions on authenticated users are not enforced."
+    remediations:
+      - "Implement least privilege and deny by default."
+      - "Enforce access controls server-side, not just UI."
+      - "Log access control failures and alert on repeated failures."
+
+  - id: "A02:2021"
+    name: "Cryptographic Failures"
+    description: "Data exposed in transit or at rest due to weak/absent encryption."
+    remediations:
+      - "Classify sensitive data; apply encryption at rest and in transit."
+      - "Use strong, up-to-date cryptographic algorithms (TLS 1.2+)."
+      - "Never store passwords in cleartext; use bcrypt/argon2."
+
+  - id: "A03:2021"
+    name: "Injection"
+    description: "SQL, OS, LDAP, and other injection attacks."
+    remediations:
+      - "Use parameterized queries and ORMs."
+      - "Validate, filter, and sanitize all user-supplied data."
+      - "Use LIMIT and other SQL controls to prevent mass disclosure."
+
+  - id: "A04:2021"
+    name: "Insecure Design"
+    description: "Missing or ineffective security controls in the design phase."
+    remediations:
+      - "Use threat modeling during design."
+      - "Implement secure design patterns and reference architectures."
+
+  - id: "A05:2021"
+    name: "Security Misconfiguration"
+    description: "Insecure default configurations, open cloud storage, verbose error messages."
+    remediations:
+      - "Implement a secure configuration baseline and automated verification."
+      - "Remove or disable unnecessary features, components, and sample apps."
+      - "Set strict Content-Security-Policy and CORS headers."
+
+  - id: "A06:2021"
+    name: "Vulnerable and Outdated Components"
+    description: "Using components with known vulnerabilities."
+    remediations:
+      - "Maintain an inventory of all components and their versions."
+      - "Continuously monitor CVE databases and apply patches promptly."
+      - "Use pip-audit, npm audit, or Dependabot."
+
+  - id: "A07:2021"
+    name: "Identification and Authentication Failures"
+    description: "Weak authentication, credential exposure, session fixation."
+    remediations:
+      - "Implement MFA; avoid default credentials."
+      - "Invalidate sessions server-side on logout."
+      - "Use secure session management with HttpOnly, Secure, SameSite cookies."
+
+  - id: "A08:2021"
+    name: "Software and Data Integrity Failures"
+    description: "Code and infrastructure without integrity verification (e.g. insecure deserialization)."
+    remediations:
+      - "Use digital signatures to verify software/data integrity."
+      - "Ensure CI/CD pipelines are secured and audited."
+
+  - id: "A09:2021"
+    name: "Security Logging and Monitoring Failures"
+    description: "Insufficient logging and monitoring allows attacks to go undetected."
+    remediations:
+      - "Log all authentication, access control, and input validation failures."
+      - "Ensure logs are in a format consumable by SIEM tools."
+      - "Establish effective alerting and incident response processes."
+
+  - id: "A10:2021"
+    name: "Server-Side Request Forgery (SSRF)"
+    description: "Server fetches remote resource without validating the user-supplied URL."
+    remediations:
+      - "Sanitize and validate all client-supplied input URLs."
+      - "Enforce network-level controls to deny requests to internal services."
+      - "Use allowlists for permitted URL schemes and destinations."

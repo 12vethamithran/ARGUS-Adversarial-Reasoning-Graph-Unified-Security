@@ -1,0 +1,97 @@
+---
+# OWASP Top 10 for LLM Applications — 2025
+# Used by L2 LLMProbeLayer and L3 RAGPoisonLayer
+version: "2025"
+source: "https://owasp.org/www-project-top-10-for-large-language-model-applications/"
+
+categories:
+  - id: "LLM01:2025"
+    name: "Prompt Injection"
+    description: >
+      Attacker manipulates LLM via crafted inputs, causing unintended actions.
+      Direct: attacker manipulates the prompt. Indirect: attacker injects via
+      external data sources (web pages, documents, RAG corpus).
+    attack_variants:
+      - "Direct system-prompt override"
+      - "Indirect injection via search result poisoning"
+      - "Role confusion / persona hijacking"
+      - "Instruction smuggling via encoded text"
+    remediations:
+      - "Implement structured output schemas (JSON mode) to constrain responses."
+      - "Validate and sanitize all inputs before LLM processing."
+      - "Use a secondary LLM to detect injections (LLM firewall pattern)."
+      - "Implement least-privilege tool invocation policies."
+
+  - id: "LLM02:2025"
+    name: "Sensitive Information Disclosure"
+    description: "LLM inadvertently reveals confidential data, PII, or system internals."
+    remediations:
+      - "Apply data sanitization before including in context windows."
+      - "Implement output filtering for PII patterns."
+      - "Use differential privacy techniques for training data."
+
+  - id: "LLM03:2025"
+    name: "Supply Chain Vulnerabilities"
+    description: "Third-party models, datasets, or plugins introduce risks."
+    remediations:
+      - "Audit all third-party model and plugin dependencies."
+      - "Verify integrity of pre-trained models (hash verification)."
+
+  - id: "LLM04:2025"
+    name: "Data and Model Poisoning"
+    description: "Manipulation of training data, fine-tuning, or embeddings to introduce backdoors."
+    remediations:
+      - "Validate and filter training data sources."
+      - "Monitor model behavior for anomalous outputs post-training."
+
+  - id: "LLM05:2025"
+    name: "Improper Output Handling"
+    description: "Insufficient validation of LLM output before passing to downstream systems."
+    remediations:
+      - "Treat LLM output as untrusted user input."
+      - "Apply output encoding appropriate to the consumption context."
+
+  - id: "LLM06:2025"
+    name: "Excessive Agency"
+    description: "LLM-based system granted too many permissions, enabling harmful autonomous actions."
+    remediations:
+      - "Apply principle of least privilege to all tool permissions."
+      - "Require human confirmation for high-impact actions."
+      - "Implement kill switches and rate limits on agentic systems."
+
+  - id: "LLM07:2025"
+    name: "System Prompt Leakage"
+    description: "System prompt extracted via direct request or indirect inference."
+    remediations:
+      - "Do not store sensitive data in system prompts."
+      - "Instruct LLM to refuse to repeat system prompt contents."
+      - "Use prompt injection detection as a secondary guard."
+
+  - id: "LLM08:2025"
+    name: "Vector and Embedding Weaknesses"
+    description: >
+      Vulnerabilities in RAG pipelines: adversarial documents displace benign
+      context (PoisonedRAG), embedding inversion, or data extraction via embeddings.
+    attack_variants:
+      - "PoisonedRAG: inject adversarial docs to manipulate retrieved context"
+      - "Embedding inversion to recover training data"
+      - "Retrieval displacement: high-similarity adversarial docs crowd out benign ones"
+    remediations:
+      - "Sign and hash all documents in the RAG corpus."
+      - "Monitor embedding similarity distributions for outliers."
+      - "Implement retrieval anomaly detection."
+      - "Use access controls on the RAG corpus."
+
+  - id: "LLM09:2025"
+    name: "Misinformation"
+    description: "LLM produces authoritative-sounding but factually incorrect output."
+    remediations:
+      - "Implement retrieval-augmented generation with verified sources."
+      - "Add factual grounding checks before presenting outputs."
+
+  - id: "LLM10:2025"
+    name: "Unbounded Consumption"
+    description: "Denial-of-service via resource exhaustion through adversarial prompts."
+    remediations:
+      - "Implement rate limiting and token budget caps per request."
+      - "Monitor resource usage patterns for anomalous consumption."

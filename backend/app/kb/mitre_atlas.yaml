@@ -1,0 +1,81 @@
+---
+# MITRE ATLAS (Adversarial Threat Landscape for AI Systems)
+# Selected techniques relevant to ARGUS AI-specific layers
+version: "4.5"
+source: "https://atlas.mitre.org/"
+
+techniques:
+  - id: "AML.T0051"
+    name: "LLM Prompt Injection"
+    tactic: "ML Attack Staging"
+    description: >
+      Attacker crafts inputs to manipulate LLM behavior, bypassing instructions
+      or extracting confidential information from the model or its context.
+    layer_relevance: [2]
+    remediations:
+      - "Implement input validation and output filtering."
+      - "Use structured output schemas to constrain LLM responses."
+      - "Apply secondary LLM-based injection detection."
+
+  - id: "AML.T0020"
+    name: "Poison Training Data"
+    tactic: "ML Attack Staging"
+    description: >
+      Attacker injects malicious samples into training or fine-tuning data
+      to introduce backdoors or degrade model performance.
+    layer_relevance: [3]
+    remediations:
+      - "Validate and audit training data sources."
+      - "Monitor model behavior post-training for anomalies."
+
+  - id: "AML.T0012"
+    name: "Valid Accounts (ML Pipeline)"
+    tactic: "Initial Access"
+    description: >
+      Adversaries use compromised ML infrastructure credentials
+      (API keys, OAuth tokens, MCP session tokens) to access AI systems.
+    layer_relevance: [8]
+    remediations:
+      - "Store API keys in secrets managers (never in URLs or env files committed to VCS)."
+      - "Implement token rotation and short TTLs."
+      - "Monitor for anomalous API key usage patterns."
+
+  - id: "AML.T0043"
+    name: "Craft Adversarial Data"
+    tactic: "ML Attack Staging"
+    description: "Attacker crafts inputs that cause ML models to produce incorrect outputs."
+    layer_relevance: [2, 3]
+    remediations:
+      - "Implement adversarial input detection."
+      - "Apply input preprocessing and normalization."
+
+  - id: "AML.T0040"
+    name: "ML Model Inference API Access"
+    tactic: "ML Model Access"
+    description: "Attacker accesses a victim ML model through an exposed inference API."
+    layer_relevance: [2]
+    remediations:
+      - "Rate-limit inference API endpoints."
+      - "Authenticate all API requests; monitor for scraping patterns."
+
+  - id: "AML.T0054"
+    name: "LLM Plugin Compromise"
+    tactic: "ML Attack Staging"
+    description: >
+      Attacker compromises an LLM plugin or tool integration to execute
+      arbitrary actions with the LLM's granted permissions. Related to MCP attacks.
+    layer_relevance: [4]
+    cve_class: "CVE-2025-6514"
+    remediations:
+      - "Audit all third-party plugins and tool integrations."
+      - "Apply least-privilege permissions to all tool grants."
+      - "Monitor tool invocation logs for anomalous patterns."
+
+  - id: "AML.T0048"
+    name: "Societal Harm"
+    tactic: "Impact"
+    description: "Attacker uses compromised AI system to cause harm at scale via misinformation or automated attacks."
+    layer_relevance: [7]
+    remediations:
+      - "Implement content moderation and output monitoring."
+      - "Rate-limit and audit agentic system outputs."

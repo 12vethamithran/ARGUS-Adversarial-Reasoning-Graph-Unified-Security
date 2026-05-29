@@ -1,0 +1,409 @@
+================================================================================
+ARGUS — ADVERSARIAL REASONING & GRAPH-BASED UNIFIED SECURITY FRAMEWORK
+Project Kickoff Brief  ·  v1.0
+================================================================================
+
+PURPOSE OF THIS FILE
+--------------------
+This is the single source of truth to start building ARGUS in Claude Cowork.
+Hand this whole file to Cowork as the project context. Everything needed to
+begin — the concept, the research justification, the architecture, the tech
+stack, the file structure, the data contracts, and the build order — is here.
+
+--------------------------------------------------------------------------------
+1. ONE-LINE PITCH
+--------------------------------------------------------------------------------
+ARGUS is a dual-mode, AI-augmented red-team REASONING platform that models how
+an attacker chains web -> LLM -> agentic -> network vectors across 8 attack
+layers in a single coordinated campaign. It is NOT a scanner. It reasons about
+emergent cross-domain attack chains and outputs a narrative attack graph,
+exploitability/novelty scores, and a professional threat report mapped to OWASP
+and MITRE frameworks.
+
+--------------------------------------------------------------------------------
+2. WHY THIS PROJECT (RESEARCH JUSTIFICATION — use these in your paper/resume)
+--------------------------------------------------------------------------------
+- 79% of enterprises deploy AI agents; 97% lack proper security controls.
+- Prompt injection is #1 on the OWASP Top 10 for LLM Applications 2025.
+- Only 24% of enterprises have a dedicated AI security governance team.
+- AI red-teaming demand projected to surge ~35% by 2028 with little supply.
+- RAG poisoning (PoisonedRAG, USENIX Security 2025): injecting ~5 malicious docs
+  into a corpus of millions manipulates responses ~90% of the time.
+- 43% of public MCP servers are vulnerable to command execution; 30 CVEs in 60
+  days; ~21,000 exposed AI agent instances (early 2026).
+- The real GAP: every existing tool is siloed. Burp/ZAP test web only;
+  Garak/PyRIT test LLMs only; Nessus/Metasploit test network only. NONE model a
+  chained attack where a web injection feeds an LLM that executes a network
+  action. ARGUS targets exactly this unaddressed cross-layer reasoning gap.
+
+--------------------------------------------------------------------------------
+3. DUAL MODE DESIGN
+--------------------------------------------------------------------------------
+BASIC MODE (quick assessment, juniors/students)
+  - Input: target URL + LLM API endpoint (or a described/hypothetical target)
+  - Runs Layers 1, 2, 3 automatically
+  - Reasoning engine generates top 3 attack chains
+  - Output: live visual attack graph + 1-page HTML threat report
+  - No terminal, no manual commands, no config required
+
+ADVANCED MODE (red teamers / researchers)
+  - Everything in Basic, plus:
+  - Full 8-layer sweep (configurable which layers activate)
+  - Sandboxed in-browser terminal (xterm.js) with WHITELISTED commands only
+  - Manual chain injection (analyst defines a hypothesis; engine reasons on it)
+  - Layer-by-layer drill-down with raw evidence
+  - Multi-agent propagation simulation with configurable topology
+  - Chain replay timeline (LangGraph checkpoint time-travel)
+  - Export: STIX 2.1 structured threat intel + full PDF report
+
+--------------------------------------------------------------------------------
+4. THE 8 ATTACK LAYERS
+--------------------------------------------------------------------------------
+L1  Web surface        OWASP Web Top 10. httpx + selectolax. Headers, CSP,
+                       CORS, JS secret entropy. Emits WebFinding[]. NOT a scan.
+L2  LLM probing        OWASP LLM Top 10 (LLM01, LLM07). Direct + indirect prompt
+                       injection, system-prompt leakage, jailbreak families.
+                       Versioned payload taxonomy + refusal/compliance scorer.
+L3  RAG poisoning      PoisonedRAG model, LLM08:2025. In-memory faiss-cpu index,
+                       adversarial doc injection, retrieval displacement metric.
+L4  MCP / Agentic      OWASP Agentic Top 10, CVE-2025-6514 class. Mock MCP server
+                       harness: tool-call hijack, confused deputy, rug-pull.
+L5  Network recon      MITRE ATT&CK (T1046, T1021). scapy + async sockets.
+                       Topology graph + lateral-movement path edges. Feeds from
+                       whitelisted terminal output (nmap/traceroute).
+L6  Supply chain       SkillJect / STAC. pip-audit, typosquat via Levenshtein,
+                       skill-ecosystem poisoning model.
+L7  Multi-agent prop.  MASpi / Prompt Infection. networkx graph diffusion sim:
+                       seed one compromised agent, model infection over hops.
+L8  Identity / OAuth   MITRE ATLAS. MCP session hijack / OAuth token intercept
+                       (CVE-2025-6514 class). Flags plaintext token transmission.
+
+--------------------------------------------------------------------------------
+5. THE SANDBOXED TERMINAL (Advanced mode only)
+--------------------------------------------------------------------------------
+FRONTEND: xterm.js v5 + @xterm/addon-fit + @xterm/addon-web-links in a React
+component, connected over a WebSocket. Branded prompt: argus@target:~$
+Whitelist autocomplete; blocked commands show inline red rejection + reason.
+
+BACKEND: PURE PYTHON (no node-pty). Use ptyprocess to spawn a restricted PTY per
+session, streamed over a FastAPI WebSocket. Every keystroke/command passes a
+command-filter middleware BEFORE execution.
+
+WHITELIST (hardcoded, not user-configurable):
+  nmap (safe flags only: -sV -sC -p --script safe; BLOCK -O -A -sS),
+  curl (BLOCK --upload-file, -X DELETE), dig, whois, netstat, traceroute,
+  host, ping, openssl s_client, nikto (read-only), whatweb
+
+ENFORCEMENT: shlex.split() parse -> per-binary argument policy -> allow/deny.
+Non-whitelisted binary -> blocked + branded error + logged. Plus: per-session
+rate limiting, process timeout, resource.setrlimit limits, idle auto-kill.
+
+AUDIT: append-only JSONL (timestamp, session_id, command, status). Auto-surfaced
+in the final report as a "terminal activity" appendix.
+
+--------------------------------------------------------------------------------
+6. ZERO-DATABASE STORAGE (deliberate architecture choice)
+--------------------------------------------------------------------------------
+No PostgreSQL, SQLite, Redis. Everything is files (aiofiles, atomic write =
+write-temp-then-rename), ULID-keyed, with a session TTL janitor.
+  Session state        ./data/sessions/{ULID}.json
+  Attack graphs        ./data/graphs/{ULID}.gpickle   (networkx)
+  Terminal audit log   ./data/logs/{ULID}_audit.jsonl
+  Knowledge base       ./backend/app/kb/*.yaml  (OWASP + MITRE, structured)
+  Reports              ./data/reports/{ULID}_report.html
+  Chain cache          ./data/cache/{ULID}_chains.json
+Rationale: ARGUS is a per-session, ephemeral tool, not multi-tenant SaaS. A
+session folder zips and ships to a colleague. No ORM, no migrations.
+
+--------------------------------------------------------------------------------
+7. TECH STACK (current as of 2026 — pin these)
+--------------------------------------------------------------------------------
+FRONTEND (-> Vercel)
+  React 18 + TypeScript + Vite
+  Tailwind CSS + shadcn/ui
+  D3.js (force-directed attack graph)
+  @xterm/xterm (terminal)
+  framer-motion (transitions)
+  zustand (state)
+  Aesthetic: dark technical "command center", monospace for technical data,
+  ONE accent color (electric cyan or amber) for active states.
+
+BACKEND (-> Render, Docker web service)
+  Python 3.12, FastAPI, uvicorn
+  langgraph >= 2.0  (StateGraph + supervisor pattern + checkpointer +
+                     astream_events for per-node live streaming)
+  langchain (building blocks)
+  google-genai (Gemini Flash 2.0 reasoning)
+  pydantic v2 + pydantic-settings
+  httpx, selectolax, scapy, ptyprocess
+  faiss-cpu, sentence-transformers (in-memory; novelty + RAG sim)
+  networkx (attack graph + multi-agent diffusion)
+  pip-audit (supply chain)
+  aiofiles, structlog, slowapi (rate limit)
+  jinja2 + weasyprint (HTML -> PDF report)
+  python-ulid
+
+KEY UPGRADES vs earlier drafts:
+  - LangGraph 2.0 (Feb 2026): checkpointing enables pause/resume + replay.
+  - astream_events(): per-node streaming drives the live frontend.
+  - Dropped node-pty -> pure-Python ptyprocess (single-language backend).
+
+--------------------------------------------------------------------------------
+8. DEPLOYMENT TOPOLOGY
+--------------------------------------------------------------------------------
+LOCAL DEV
+  Frontend: vite dev server on localhost:5173 (proxies /api and /ws -> :8000)
+  Backend:  uvicorn --reload on localhost:8000, local ./data folder
+  Optional: docker-compose up  (runs both together)
+
+PRODUCTION
+  Frontend -> Vercel (static SPA build, global CDN). Env: VITE_API_URL,
+              VITE_WS_URL pointing at Render.
+  Backend  -> Render Web Service (persistent container). Holds the WebSocket +
+              PTY alive (VERCEL CANNOT — serverless kills long-lived WS).
+              Persistent disk mounted at /data. Dockerfile preinstalls the
+              whitelisted binaries (nmap, dig, curl, whois, traceroute, nikto,
+              whatweb, openssl). /health endpoint for Render checks.
+  Gemini API: called ONLY from Render. API key NEVER touches the frontend.
+  CORS: ALLOWED_ORIGINS env restricts to the Vercel domain in prod.
+
+--------------------------------------------------------------------------------
+9. FRONTEND — THE 6 IMPACTFUL FEATURES (the demo carriers)
+--------------------------------------------------------------------------------
+1. LIVE ATTACK-GRAPH CANVAS (centerpiece): D3 force-directed. Nodes light up as
+   astream_events arrive: discovered(gray) -> probing(pulsing amber) ->
+   exploitable(red) -> chained(cyan edge). Watch the chain assemble itself.
+2. STREAMING REASONING CONSOLE: typewriter panel showing Gemini's chain-of-
+   reasoning live ("L2 injection succeeded -> does output feed L5 network?").
+3. EXPLOITABILITY HEATMAP: matrix of layers x MITRE ATT&CK/ATLAS tactics, cells
+   colored by chain severity. Signals framework literacy instantly.
+4. EMBEDDED TERMINAL (advanced): real xterm.js, whitelist autocomplete, inline
+   red rejection feedback for blocked commands.
+5. CHAIN REPLAY TIMELINE: scrub through the attack step-by-step using LangGraph
+   checkpoint history ("time-travel"). Rare in student projects.
+6. REPORT STUDIO: live styled threat doc, severity badges, remediation cards
+   mapped to OWASP + MITRE, export-to-PDF button.
+
+POLISH: skeleton loaders, optimistic toggle UI, Cmd+K command palette, keyboard
+shortcuts, empty-state onboarding, toasts, responsive graph collapse, dark/light
+via CSS variables, "Powered by Gemini reasoning" badge.
+
+--------------------------------------------------------------------------------
+10. BACKEND — PER-MODULE DEPTH (each layer is a subsystem, not a function)
+--------------------------------------------------------------------------------
+orchestrator.py   LangGraph 2.0 StateGraph. Supervisor/router node picks layers
+                  from target profile. Conditional edges = layer dependencies
+                  (L3 runs only if L2 found an LLM). Typed ArgusState (pydantic).
+                  In-memory checkpointer (no DB) -> pause/resume/replay.
+                  Iteration counter prevents runaway loops.
+reasoner.py       Gemini Flash, structured-output contract (pydantic-validated
+                  Chain JSON). Novelty scorer: embedding similarity vs known-
+                  technique KB; chains NOT matching published techniques score
+                  higher (implements the "novel attack" research gap). Retry w/
+                  exponential backoff, prompt versioning, token budgeting.
+scorer.py         Composite = exploitability (CVSS-inspired) + impact + novelty.
+                  Deterministic, unit-testable.
+graph_builder.py  All findings -> networkx DiGraph -> frontend JSON for D3 ->
+                  persist .gpickle.
+layers/base.py    Layer ABC: run(target, state) -> list[Finding].
+layers/*.py       The 8 modules described in section 4. Each emits typed
+                  Findings, maps to a specific OWASP/MITRE ID, collects evidence.
+terminal/*.py     whitelist (per-binary arg policy + rate limit + timeout),
+                  pty_bridge (ptyprocess + WS backpressure + setrlimit + idle
+                  kill), auditor (append-only JSONL).
+storage/*.py      aiofiles async I/O, ULID keys, atomic writes, TTL janitor.
+
+CROSS-CUTTING: structlog structured logging, pydantic v2 at every boundary,
+pytest (node-level unit tests + 2-3 full-graph integration tests), slowapi rate
+limiting, env-based CORS, /health, Dockerfile preinstalling whitelisted binaries.
+
+--------------------------------------------------------------------------------
+11. PROJECT FILE STRUCTURE
+--------------------------------------------------------------------------------
+argus/
+  README.md
+  docker-compose.yml                 # local: frontend + backend together
+
+  frontend/                          # -> Vercel
+    package.json                     # react18, vite, ts, tailwind, shadcn/ui,
+                                     #   d3, @xterm/xterm, framer-motion, zustand
+    vite.config.ts                   # dev proxy: /api + /ws -> :8000
+    .env.example                     # VITE_API_URL, VITE_WS_URL
+    tailwind.config.ts
+    index.html
+    src/
+      main.tsx
+      App.tsx                        # mode-aware shell + routing
+      store/
+        sessionStore.ts              # zustand: session + findings
+        eventStream.ts               # SSE/WS subscription to astream_events
+      lib/
+        api.ts                       # typed fetch client
+        ws.ts                        # terminal WebSocket client
+      components/
+        shell/Sidebar.tsx            # 8-layer nav rail
+        shell/Topbar.tsx             # Basic/Advanced animated toggle
+        shell/CommandPalette.tsx     # Cmd+K
+        graph/AttackGraph.tsx        # D3 force-directed, live node states
+        graph/useForceGraph.ts
+        reasoning/ReasoningConsole.tsx
+        heatmap/ExploitHeatmap.tsx   # layer x MITRE matrix
+        terminal/Terminal.tsx        # xterm.js (advanced only)
+        terminal/useTerminal.ts
+        timeline/ChainReplay.tsx     # checkpoint scrubber
+        report/ReportStudio.tsx
+        report/FindingCard.tsx
+      pages/
+        Dashboard.tsx
+        Onboarding.tsx
+
+  backend/                           # -> Render (Docker web service)
+    pyproject.toml
+    Dockerfile                       # python:3.12-slim + nmap,dig,curl,whois,
+                                     #   traceroute,nikto,whatweb,openssl
+    .env.example                     # GEMINI_API_KEY, ALLOWED_ORIGINS, DATA_DIR
+    render.yaml                      # Render blueprint
+    app/
+      main.py                        # FastAPI app, CORS, middleware, /health
+      config.py                      # pydantic-settings
+      routers/
+        session.py
+        analyze.py                   # POST start sweep; SSE stream events
+        terminal.py                  # WS PTY endpoint
+        report.py
+      engine/
+        state.py                     # ArgusState typed model
+        orchestrator.py              # StateGraph + supervisor + checkpointer
+        reasoner.py
+        scorer.py
+        graph_builder.py
+      layers/
+        base.py                      # Layer ABC: run() -> list[Finding]
+        web.py
+        llm_probe.py
+        rag_poison.py
+        mcp_agent.py
+        network.py
+        supply_chain.py
+        multi_agent.py
+        identity.py
+      terminal/
+        pty_bridge.py
+        whitelist.py
+        auditor.py
+      kb/
+        owasp_web.yaml
+        owasp_llm.yaml
+        owasp_agentic.yaml
+        mitre_attack.yaml
+        mitre_atlas.yaml
+      storage/
+        session_store.py
+        report_writer.py
+      models/                        # pydantic: Finding, Chain, Session
+      templates/report.html.j2
+    tests/
+      test_layers/                   # node-level unit tests
+      test_whitelist.py
+      test_graph_integration.py
+
+--------------------------------------------------------------------------------
+12. THE 3 DATA CONTRACTS (define these FIRST — they unblock parallel work)
+--------------------------------------------------------------------------------
+Pin these before any logic. If stable, frontend + backend build in parallel.
+
+(A) Finding  — what every layer emits
+    id: str (ULID)
+    layer: int (1-8)
+    title: str
+    severity: "info" | "low" | "medium" | "high" | "critical"
+    owasp_ref: str | null        e.g. "LLM01:2025"
+    mitre_ref: str | null        e.g. "T1046" or "AML.T0012"
+    evidence: dict               raw supporting data
+    exploitable: bool
+    confidence: float (0-1)
+
+(B) Chain  — what the reasoner emits
+    id: str (ULID)
+    steps: Finding.id[]          ordered cross-layer path
+    narrative: str               human-readable attack story
+    exploitability: float (0-1)
+    impact: float (0-1)
+    novelty: float (0-1)         high = not in published technique KB
+    priority: float              composite score
+    remediations: { layer:int, action:str, ref:str }[]
+
+(C) StreamEvent  — what astream_events pushes to the frontend
+    type: "node_state" | "reasoning_token" | "chain_found" | "layer_done"
+         | "error" | "complete"
+    payload: dict
+    ts: float
+    node_state payload: { finding_id, state: "discovered"|"probing"
+                         |"exploitable"|"chained" }
+
+--------------------------------------------------------------------------------
+13. BUILD ORDER (for Claude Cowork)
+--------------------------------------------------------------------------------
+STEP 0  Shared models + contracts. Write pydantic models (Finding, Chain,
+        StreamEvent, Session) AND matching TypeScript types. This is the
+        foundation — do it first.
+
+STEP 1  FastAPI skeleton + MOCK streaming endpoint. POST /api/analyze that emits
+        FAKE StreamEvents over SSE on a timer. This lets the entire impressive
+        frontend be built against fake data before any real layer exists.
+
+STEP 2  Frontend shell + the 6 features wired to the mock stream: attack graph,
+        reasoning console, heatmap, mode toggle, report studio. Get it BEAUTIFUL
+        against fake data first.
+
+STEP 3  Real Layers 1 + 2 (web + LLM probe). Wire reasoner.py (Gemini). Replace
+        the mock. Basic mode now works end-to-end LOCALLY.
+
+STEP 4  Terminal subsystem: ptyprocess pty_bridge + whitelist + auditor +
+        xterm.js Terminal.tsx. Advanced mode unlocked.
+
+STEP 5  Layers 3-8 one at a time (rag_poison, mcp_agent, network, supply_chain,
+        multi_agent, identity). Each plugs into orchestrator + graph.
+
+STEP 6  Report studio polish + weasyprint PDF export + STIX 2.1 export +
+        chain replay timeline (checkpoint scrubber).
+
+STEP 7  Dockerfile + render.yaml + Vercel config. Deploy ONLY after Basic mode
+        works end-to-end locally.
+
+FIRST COWORK PROMPT (paste this after the brief):
+"Build the shared Pydantic models and TypeScript types for Finding, Chain,
+StreamEvent, and Session, then scaffold the FastAPI skeleton with a mock
+/api/analyze SSE endpoint that emits fake StreamEvents on a timer."
+
+--------------------------------------------------------------------------------
+14. RESUME LINE (final deliverable)
+--------------------------------------------------------------------------------
+ARGUS — Multi-Layer Adversarial Reasoning & Security Framework
+Designed and built a dual-mode AI-augmented red-team reasoning platform modeling
+8 cross-domain attack layers spanning OWASP Web Top 10, OWASP LLM Top 10 (2025),
+OWASP Agentic Top 10 (2025), MITRE ATT&CK, and MITRE ATLAS. Advanced mode
+integrates a sandboxed in-browser terminal with whitelisted command execution
+via a pure-Python PTY WebSocket bridge and JSONL audit logging. Attack chains
+are generated by a LangGraph 2.0 + Gemini Flash reasoning pipeline with
+checkpoint-based replay, visualized as live force-directed D3.js attack graphs,
+and exported as STIX 2.1 threat intel and PDF reports. Zero-database
+architecture using ULID-keyed JSON sessions and NetworkX graph persistence.
+Deployed via Vercel (frontend) and Render (backend).
+
+--------------------------------------------------------------------------------
+15. SCOPE PHASES (what to build vs document)
+--------------------------------------------------------------------------------
+MVP (resume-ready): Steps 0-3 + Step 4 terminal. Basic mode + 3 layers + live
+  graph + terminal, running locally.
+Paper-level: add Layers 3,4,7 fully (RAG poisoning, MCP, multi-agent), novelty
+  scoring, a sandboxed case study against a public LLM API (ethical, isolated).
+Stretch: STIX export, chain replay time-travel, full 8-layer sweep, cloud deploy.
+
+ETHICS NOTE: ARGUS reasons about and SIMULATES attacks against targets you own
+or have explicit authorization to test. The terminal whitelist is intentionally
+restricted to safe, non-destructive reconnaissance commands. Keep it that way.
+
+================================================================================
+END OF BRIEF
+================================================================================

@@ -1,0 +1,86 @@
+---
+# MITRE ATT&CK — Selected Techniques relevant to ARGUS layers
+# Focus: network recon, lateral movement, initial access, persistence
+version: "14.1"
+source: "https://attack.mitre.org/"
+
+techniques:
+  - id: "T1046"
+    name: "Network Service Discovery"
+    tactic: "Discovery"
+    description: "Adversaries scan networks to discover services running on remote hosts."
+    layer_relevance: [5]
+    remediations:
+      - "Implement network segmentation and firewall rules."
+      - "Monitor for port scanning activity (IDS/IPS)."
+      - "Disable unnecessary services and close exposed ports."
+
+  - id: "T1021"
+    name: "Remote Services"
+    tactic: "Lateral Movement"
+    description: >
+      Adversaries use valid credentials with remote services (SSH, RDP, SMB)
+      to laterally move through a network.
+    layer_relevance: [5]
+    remediations:
+      - "Require MFA for all remote access."
+      - "Restrict remote service access via network ACLs."
+      - "Monitor authentication logs for anomalous remote logins."
+
+  - id: "T1190"
+    name: "Exploit Public-Facing Application"
+    tactic: "Initial Access"
+    description: "Adversaries exploit vulnerabilities in public-facing web applications."
+    layer_relevance: [1]
+    remediations:
+      - "Apply patches and security updates promptly."
+      - "Use a WAF to filter malicious requests."
+      - "Perform regular vulnerability assessments."
+
+  - id: "T1059"
+    name: "Command and Scripting Interpreter"
+    tactic: "Execution"
+    description: "Adversaries abuse scripting interpreters to execute commands."
+    layer_relevance: [4, 5]
+    remediations:
+      - "Apply application allowlisting."
+      - "Monitor script execution with EDR tools."
+
+  - id: "T1195"
+    name: "Supply Chain Compromise"
+    tactic: "Initial Access"
+    description: "Adversaries compromise software supply chain to deliver malicious code."
+    layer_relevance: [6]
+    remediations:
+      - "Verify integrity of all third-party packages (hashes, signatures)."
+      - "Use private registries with curated, audited packages."
+      - "Monitor for typosquatting in package names."
+
+  - id: "T1078"
+    name: "Valid Accounts"
+    tactic: "Defense Evasion / Persistence / Initial Access"
+    description: "Adversaries use compromised credentials to access systems."
+    layer_relevance: [8]
+    remediations:
+      - "Implement MFA across all accounts."
+      - "Monitor for credential abuse and anomalous logins."
+      - "Rotate API keys and OAuth tokens regularly."
+
+  - id: "T1550"
+    name: "Use Alternate Authentication Material"
+    tactic: "Defense Evasion / Lateral Movement"
+    description: "Use of API keys, OAuth tokens, or session cookies to bypass authentication."
+    layer_relevance: [8]
+    remediations:
+      - "Never transmit tokens in URLs or plaintext."
+      - "Implement short token TTLs with rotation."
+      - "Monitor for token reuse from unexpected IPs."
+
+  - id: "T1071"
+    name: "Application Layer Protocol"
+    tactic: "Command and Control"
+    description: "Adversaries use standard application protocols (HTTP, DNS) for C2."
+    layer_relevance: [5, 4]
+    remediations:
+      - "Monitor DNS queries for unusual domains and frequencies."
+      - "Inspect HTTP traffic for anomalous patterns."

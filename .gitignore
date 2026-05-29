@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────
+# Secrets / environment — NEVER commit real values
+# ─────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
+secrets.*
+
+# ─────────────────────────────────────────────
+# Python (backend)
+# ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+*.log
+
+# Runtime data (scan sessions, audit logs, generated reports, caches)
+backend/data/
+data/
+!backend/data/.gitkeep
+
+# uvicorn capture logs created during local runs
+backend/uvicorn.*.log
+
+# ─────────────────────────────────────────────
+# Node / frontend
+# ─────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+.vite/
+*.local
+vite.config.ts.timestamp-*
+
+# ─────────────────────────────────────────────
+# Editor / OS
+# ─────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local agent/preview config
+.claude/launch.json

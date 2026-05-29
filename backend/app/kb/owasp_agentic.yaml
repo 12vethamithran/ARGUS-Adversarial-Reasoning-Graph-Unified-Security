@@ -1,0 +1,88 @@
+---
+# OWASP Top 10 for Agentic AI Applications — 2025 (Draft)
+# Used by L4 MCPAgentLayer and L7 MultiAgentLayer
+version: "2025-draft"
+source: "https://owasp.org/www-project-top-10-for-agentic-ai-applications/"
+
+categories:
+  - id: "OWASP-AGT-01"
+    name: "Unsafe Tool Invocation"
+    description: >
+      Agent invokes tools without adequate authorization or safety checks.
+      Attacker manipulates the agent via prompt injection to call privileged tools.
+    cve_class: "CVE-2025-6514"
+    attack_variants:
+      - "Tool-call hijack: injection redirects tool target"
+      - "Confused deputy: agent uses own credentials for attacker-controlled actions"
+      - "Rug-pull: malicious MCP server changes tool behavior post-authorization"
+    remediations:
+      - "Implement tool-call sandboxing with explicit permission manifests."
+      - "Require human-in-the-loop for high-impact tool invocations."
+      - "Validate tool targets against an allowlist before execution."
+
+  - id: "OWASP-AGT-02"
+    name: "Overprivileged Identity"
+    description: "Agent operates with excessive permissions beyond what the task requires."
+    remediations:
+      - "Apply least-privilege principle to all agent identities."
+      - "Use ephemeral, scoped credentials for each agent action."
+
+  - id: "OWASP-AGT-03"
+    name: "Insufficient Agent Isolation"
+    description: "Agents share context, memory, or resources, allowing cross-agent contamination."
+    remediations:
+      - "Isolate agent memory and context per session."
+      - "Implement message authentication between agents."
+      - "Use separate credentials per agent in multi-agent systems."
+
+  - id: "OWASP-AGT-04"
+    name: "Unverified External Content"
+    description: "Agent ingests and acts on unvalidated external data (web, files, APIs)."
+    remediations:
+      - "Treat all external content as untrusted."
+      - "Apply content filtering before processing with LLM."
+
+  - id: "OWASP-AGT-05"
+    name: "Cascading Failures in Agent Pipelines"
+    description: "Error or compromise in one agent propagates through the pipeline."
+    remediations:
+      - "Implement circuit breakers between agent steps."
+      - "Log and alert on unexpected agent state changes."
+
+  - id: "OWASP-AGT-06"
+    name: "Prompt Injection in Agentic Context"
+    description: "Prompt injection in an agentic context has amplified blast radius due to tool access."
+    remediations:
+      - "Apply LLM01:2025 remediations with elevated priority for agentic deployments."
+      - "Sandbox agent reasoning from tool execution context."
+
+  - id: "OWASP-AGT-07"
+    name: "Insecure Persisted State"
+    description: "Agent memory or state is stored insecurely, enabling tampering or exfiltration."
+    remediations:
+      - "Encrypt persisted agent state at rest."
+      - "Implement integrity checks on state before loading."
+
+  - id: "OWASP-AGT-08"
+    name: "Incomplete Audit Trails"
+    description: "Agent actions are not fully logged, preventing forensic analysis."
+    remediations:
+      - "Log all tool invocations with parameters and results."
+      - "Store audit logs in append-only, tamper-evident storage."
+
+  - id: "OWASP-AGT-09"
+    name: "Prompt Infection / Multi-Agent Propagation"
+    description: >
+      A compromised agent propagates malicious instructions to peer agents
+      via shared memory, message passing, or tool outputs. (MASpi / Prompt Infection model)
+    remediations:
+      - "Implement inter-agent message signing and verification."
+      - "Monitor for anomalous message patterns in agent mesh."
+      - "Limit agent-to-agent trust by default; require explicit allowlisting."
+
+  - id: "OWASP-AGT-10"
+    name: "Uncontrolled Recursion / Loop Amplification"
+    description: "Agent enters infinite loops or creates recursive sub-agents, exhausting resources."
+    remediations:
+      - "Implement hard iteration limits on all agentic loops."
+      - "Apply token and time budgets per agent invocation chain."

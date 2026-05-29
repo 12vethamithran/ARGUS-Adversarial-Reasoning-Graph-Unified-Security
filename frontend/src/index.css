@@ -1,0 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   ARGUS THEME TOKENS
+   Colors are stored as space-separated RGB channels so Tailwind
+   utilities can apply alpha:  rgb(var(--accent) / <alpha-value>)
+   Two themes are switched via [data-theme] on the app root.
+   ============================================================ */
+
+:root,
+[data-theme="advanced"] {
+  /* ── Advanced: dark-red war room ─────────────────────────── */
+  color-scheme: dark;
+  --bg:            12 7 10;        /* #0c070a */
+  --surface:       22 12 15;       /* #160c0f */
+  --raised:        31 16 20;       /* #1f1014 */
+  --overlay:       42 20 26;       /* #2a141a */
+  --border:        255 90 110;     /* tinted red, used at low alpha */
+  --border-alpha:  0.12;
+
+  --text:          243 232 235;    /* #f3e8eb */
+  --text-secondary:200 154 162;    /* #c89aa2 */
+  --text-muted:    138 97 104;     /* #8a6168 */
+
+  --accent:        255 61 87;      /* #ff3d57 crimson */
+  --accent-strong: 225 29 72;      /* #e11d48 */
+  --accent-contrast: 255 255 255;
+
+  /* graph node states */
+  --node-discovered:  120 80 88;
+  --node-probing:     255 179 0;
+  --node-exploitable: 255 61 87;
+  --node-chained:     255 138 76;  /* orange to pop against red */
+
+  --grid-line:     255 90 110;
+  --glow:          255 61 87;
+}
+
+[data-theme="basic"] {
+  /* ── Basic: clean light-blue ─────────────────────────────── */
+  color-scheme: light;
+  --bg:            239 246 255;    /* #eff6ff */
+  --surface:       255 255 255;    /* #ffffff */
+  --raised:        241 247 254;    /* #f1f7fe */
+  --overlay:       226 238 250;    /* #e2eefa */
+  --border:        30 64 95;       /* slate-blue, low alpha */
+  --border-alpha:  0.14;
+
+  --text:          15 34 51;       /* #0f2233 */
+  --text-secondary:59 82 104;      /* #3b5268 */
+  --text-muted:    112 137 160;    /* #7089a0 */
+
+  --accent:        14 165 233;     /* #0ea5e9 sky-500 */
+  --accent-strong: 2 132 199;      /* #0284c7 */
+  --accent-contrast: 255 255 255;
+
+  --node-discovered:  148 163 184;
+  --node-probing:     245 158 11;
+  --node-exploitable: 239 68 68;
+  --node-chained:     14 165 233;
+
+  --grid-line:     14 165 233;
+  --glow:          14 165 233;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { background: rgb(var(--bg)); }
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+/* Smooth re-skin when the theme attribute flips */
+[data-theme] { transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease; }
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(var(--accent) / 0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--accent) / 0.5); }
+
+/* ── Accessible focus ring ─────────────────────── */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Scanline overlay (advanced only) ──────────── */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.025) 2px, rgba(0,0,0,0.025) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+[data-theme="basic"] .scanlines::after { display: none; }
+
+/* ── Glow utilities ────────────────────────────── */
+.glow-accent { filter: drop-shadow(0 0 8px rgb(var(--glow) / 0.6)); }
+
+/* ── Node states (theme-aware) ─────────────────── */
+.node-discovered  { fill: rgb(var(--node-discovered)); }
+.node-probing     { fill: rgb(var(--node-probing)); filter: drop-shadow(0 0 6px rgb(var(--node-probing))); }
+.node-exploitable { fill: rgb(var(--node-exploitable)); filter: drop-shadow(0 0 10px rgb(var(--node-exploitable))); }
+.node-chained     { fill: rgb(var(--node-chained)); filter: drop-shadow(0 0 12px rgb(var(--node-chained))); }
+.edge-chained     { stroke: rgb(var(--node-chained)); stroke-width: 2; filter: drop-shadow(0 0 4px rgb(var(--node-chained) / 0.5)); }
+
+/* ── Gradient text (theme accent) ──────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, rgb(var(--accent)), rgb(var(--accent-strong)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+/* legacy aliases still used in places */
+.gradient-text-cyan { background: linear-gradient(135deg, rgb(var(--accent)), rgb(var(--accent-strong))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.gradient-text-amber { background: linear-gradient(135deg, rgb(var(--node-probing)), #ff6f00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+/* ── Glass card (theme-aware) ──────────────────── */
+.glass {
+  background: rgb(var(--surface) / 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgb(var(--border) / var(--border-alpha));
+}
+
+/* ── Animated background grid ──────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgb(var(--grid-line) / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--grid-line) / 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Pulse rings ───────────────────────────────── */
+@keyframes ping-slow { 75%, 100% { transform: scale(2); opacity: 0; } }
+.animate-ping-slow { animation: ping-slow 2s cubic-bezier(0,0,0.2,1) infinite; }
+
+/* ── Typewriter cursor ─────────────────────────── */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor-blink { animation: blink 1s step-end infinite; }
+
+/* ── Severity badges (fixed semantics across themes) ── */
+.sev-critical { background:rgba(255,61,87,0.15); color:#ff3d57; border-color:rgba(255,61,87,0.3); }
+.sev-high     { background:rgba(255,112,67,0.15); color:#ff7043; border-color:rgba(255,112,67,0.3); }
+.sev-medium   { background:rgba(255,179,0,0.15);  color:#d98a00; border-color:rgba(255,179,0,0.3); }
+.sev-low      { background:rgba(102,187,106,0.15);color:#43a047; border-color:rgba(102,187,106,0.3); }
+.sev-info     { background:rgba(66,165,245,0.15); color:#1e88e5; border-color:rgba(66,165,245,0.3); }
+
+/* ── Range input ───────────────────────────────── */
+input[type=range] { accent-color: rgb(var(--accent)); }
+
+/* ── Toast ─────────────────────────────────────── */
+@keyframes slide-in { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+@keyframes slide-out { from{transform:translateX(0);opacity:1} to{transform:translateX(110%);opacity:0} }
+.toast-enter { animation: slide-in 0.3s ease forwards; }
+.toast-exit  { animation: slide-out 0.3s ease forwards; }

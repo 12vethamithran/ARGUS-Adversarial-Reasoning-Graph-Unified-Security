@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ARGUS Threat Report — {{ session_id[:8] }}</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --cyan: #00d4ff;
+    --critical: #ef4444;
+    --high: #f97316;
+    --medium: #f59e0b;
+    --low: #3b82f6;
+    --info: #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 40px;
+  }
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid var(--cyan);
+    padding-bottom: 20px;
+    margin-bottom: 32px;
+  }
+  .logo { font-family: monospace; font-size: 28px; font-weight: 700; color: var(--cyan); letter-spacing: 4px; }
+  .logo span { color: var(--text); }
+  .meta { text-align: right; color: var(--muted); font-size: 12px; }
+  .meta strong { color: var(--text); }
+  /* Section */
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--cyan);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 28px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* Summary grid */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .num { font-size: 28px; font-weight: 700; font-family: monospace; }
+  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .stat-card.critical .num { color: var(--critical); }
+  .stat-card.high .num { color: var(--high); }
+  .stat-card.medium .num { color: var(--medium); }
+  .stat-card.low .num { color: var(--low); }
+  .stat-card.info .num { color: var(--info); }
+  /* Target info */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .info-item { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+  .info-item .key { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  .info-item .val { font-family: monospace; color: var(--text); word-break: break-all; }
+  /* Severity badge */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-family: monospace;
+  }
+  .badge.critical { background: #3b0000; color: var(--critical); border: 1px solid var(--critical); }
+  .badge.high { background: #3b1500; color: var(--high); border: 1px solid var(--high); }
+  .badge.medium { background: #3b2a00; color: var(--medium); border: 1px solid var(--medium); }
+  .badge.low { background: #001a3b; color: var(--low); border: 1px solid var(--low); }
+  .badge.info { background: #1a1d23; color: var(--info); border: 1px solid var(--info); }
+  /* Finding card */
+  .finding-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--border);
+  }
+  .finding-card.critical { border-left-color: var(--critical); }
+  .finding-card.high { border-left-color: var(--high); }
+  .finding-card.medium { border-left-color: var(--medium); }
+  .finding-card.low { border-left-color: var(--low); }
+  .finding-card.info { border-left-color: var(--info); }
+  .finding-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .finding-title { font-weight: 600; flex: 1; }
+  .finding-refs { font-size: 11px; color: var(--muted); font-family: monospace; }
+  .finding-refs span { margin-right: 8px; }
+  .layer-tag {
+    font-size: 10px;
+    font-family: monospace;
+    background: #0d1b2a;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    border-radius: 3px;
+    padding: 1px 6px;
+  }
+  .confidence-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .confidence-bar .fill { height: 100%; background: var(--cyan); }
+  /* Chain card */
+  .chain-card {
+    background: var(--surface);
+    border: 1px solid var(--cyan);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .chain-narrative { color: var(--text); margin-bottom: 12px; font-style: italic; }
+  .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .score-item { text-align: center; }
+  .score-item .score-val { font-family: monospace; font-size: 18px; font-weight: 700; color: var(--cyan); }
+  .score-item .score-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  /* Remediation */
+  .remediation-list { list-style: none; }
+  .remediation-list li {
+    padding: 8px 12px;
+    border-left: 2px solid var(--cyan);
+    margin-bottom: 6px;
+    background: #0d1b2a;
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+  }
+  .remediation-list li .ref { color: var(--cyan); font-family: monospace; margin-right: 8px; font-size: 11px; }
+  /* Terminal audit */
+  .audit-entry {
+    font-family: monospace;
+    font-size: 11px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+  }
+  .audit-entry .ts { color: var(--muted); min-width: 160px; }
+  .audit-entry .cmd { color: var(--text); flex: 1; }
+  .audit-entry .status-allow { color: #22c55e; }
+  .audit-entry .status-block { color: var(--critical); }
+  /* Footer */
+  .footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    font-family: monospace;
+  }
+  @media print {
+    body { background: white; color: black; padding: 20px; }
+    :root { --bg: white; --surface: #f8f9fa; --text: #000; --muted: #666; --border: #ddd; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ───────────────────────────────────────────────── -->
+<div class="header">
+  <div>
+    <div class="logo">ARG<span>US</span></div>
+    <div style="color: var(--muted); font-size: 11px; margin-top: 4px;">
+      Adversarial Reasoning &amp; Graph-based Unified Security Framework
+    </div>
+  </div>
+  <div class="meta">
+    <div><strong>Session ID:</strong> {{ session_id }}</div>
+    <div><strong>Generated:</strong> {{ generated_at }}</div>
+    <div><strong>Total Findings:</strong> {{ total_findings }} ({{ exploitable_count }} exploitable)</div>
+    <div><strong>Attack Chains:</strong> {{ chains | length }}</div>
+  </div>
+</div>
+
+<!-- ── TARGET ───────────────────────────────────────────────── -->
+<h2>Target</h2>
+<div class="info-grid">
+  {% if target.url %}
+  <div class="info-item"><div class="key">URL</div><div class="val">{{ target.url }}</div></div>
+  {% endif %}
+  {% if target.llm_endpoint %}
+  <div class="info-item"><div class="key">LLM Endpoint</div><div class="val">{{ target.llm_endpoint }}</div></div>
+  {% endif %}
+  {% if target.description %}
+  <div class="info-item"><div class="key">Description</div><div class="val">{{ target.description }}</div></div>
+  {% endif %}
+  {% if target.mode %}
+  <div class="info-item"><div class="key">Analysis Mode</div><div class="val">{{ target.mode | upper }}</div></div>
+  {% endif %}
+</div>
+
+<!-- ── SEVERITY SUMMARY ─────────────────────────────────────── -->
+<h2>Finding Summary</h2>
+<div class="summary-grid">
+  <div class="stat-card critical">
+    <div class="num">{{ counts.critical }}</div>
+    <div class="label">Critical</div>
+  </div>
+  <div class="stat-card high">
+    <div class="num">{{ counts.high }}</div>
+    <div class="label">High</div>
+  </div>
+  <div class="stat-card medium">
+    <div class="num">{{ counts.medium }}</div>
+    <div class="label">Medium</div>
+  </div>
+  <div class="stat-card low">
+    <div class="num">{{ counts.low }}</div>
+    <div class="label">Low</div>
+  </div>
+  <div class="stat-card info">
+    <div class="num">{{ counts.info }}</div>
+    <div class="label">Info</div>
+  </div>
+</div>
+
+<!-- ── ATTACK CHAINS ─────────────────────────────────────────── -->
+{% if chains %}
+<h2>Attack Chains</h2>
+{% for chain in chains %}
+<div class="chain-card">
+  <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+    <strong style="font-family:monospace; color:var(--cyan);">Chain {{ loop.index }}: {{ chain.id[:8] }}</strong>
+    {% if chain.priority >= 0.8 %}
+    <span class="badge critical">Priority: {{ "%.2f"|format(chain.priority) }}</span>
+    {% elif chain.priority >= 0.6 %}
+    <span class="badge high">Priority: {{ "%.2f"|format(chain.priority) }}</span>
+    {% else %}
+    <span class="badge medium">Priority: {{ "%.2f"|format(chain.priority) }}</span>
+    {% endif %}
+  </div>
+  <p class="chain-narrative">"{{ chain.narrative }}"</p>
+  <div class="score-grid">
+    <div class="score-item">
+      <div class="score-val">{{ "%.2f"|format(chain.exploitability) }}</div>
+      <div class="score-label">Exploitability</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val">{{ "%.2f"|format(chain.impact) }}</div>
+      <div class="score-label">Impact</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val">{{ "%.2f"|format(chain.novelty) }}</div>
+      <div class="score-label">Novelty</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val">{{ chain.steps | length }}</div>
+      <div class="score-label">Steps</div>
+    </div>
+  </div>
+  {% if chain.remediations %}
+  <div style="margin-top:8px;"><strong style="font-size:12px; color:var(--muted); text-transform:uppercase;">Remediations</strong></div>
+  <ul class="remediation-list" style="margin-top:8px;">
+    {% for r in chain.remediations %}
+    <li>
+      <span class="ref">{{ r.ref }}</span>
+      L{{ r.layer }}: {{ r.action }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ── FINDINGS ──────────────────────────────────────────────── -->
+<h2>All Findings ({{ total_findings }})</h2>
+{% for f in findings %}
+<div class="finding-card {{ f.severity }}">
+  <div class="finding-header">
+    <span class="badge {{ f.severity }}">{{ f.severity }}</span>
+    <span class="layer-tag">L{{ f.layer }}</span>
+    <span class="finding-title">{{ f.title }}</span>
+    {% if f.exploitable %}
+    <span class="badge critical" style="font-size:10px;">⚡ EXPLOITABLE</span>
+    {% endif %}
+  </div>
+  <div class="finding-refs">
+    {% if f.owasp_ref %}<span>📋 {{ f.owasp_ref }}</span>{% endif %}
+    {% if f.mitre_ref %}<span>🎯 {{ f.mitre_ref }}</span>{% endif %}
+    <span style="float:right; font-size:11px;">Confidence: {{ "%.0f"|format(f.confidence * 100) }}%</span>
+  </div>
+  <div class="confidence-bar">
+    <div class="fill" style="width: {{ (f.confidence * 100)|int }}%;"></div>
+  </div>
+</div>
+{% else %}
+<p style="color:var(--muted); font-style:italic;">No findings recorded.</p>
+{% endfor %}
+
+<!-- ── TERMINAL AUDIT LOG ─────────────────────────────────────── -->
+{% if audit_log %}
+<h2>Terminal Activity Audit</h2>
+<div style="background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px;">
+  {% for entry in audit_log %}
+  <div class="audit-entry">
+    <span class="ts">{{ entry.ts | default('') }}</span>
+    <span class="cmd">{{ entry.command | default('') }}</span>
+    {% if entry.status == 'allowed' %}
+    <span class="status-allow">✓ ALLOWED</span>
+    {% else %}
+    <span class="status-block">✗ BLOCKED</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ── FOOTER ─────────────────────────────────────────────────── -->
+<div class="footer">
+  ARGUS v0.1.0 · Powered by Gemini Flash Reasoning ·
+  Session {{ session_id }} · {{ generated_at }} ·
+  ETHICS: This report describes authorized security assessment findings only.
+</div>
+
+</body>
+</html>
