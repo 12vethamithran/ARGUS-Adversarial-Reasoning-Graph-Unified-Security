@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
-  ArrowRight, ArrowDown, GraduationCap, Crosshair, Check,
+  ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
 } from "lucide-react";
 
 const ACCENTS = {
@@ -22,6 +22,28 @@ const LAYERS = [
   { id: 8, Icon: KeyRound, label: "Identity / OAuth", std: "MITRE ATLAS" },
 ];
 
+const STATS = [
+  { v: "8", l: "Attack layers correlated" },
+  { v: "24+", l: "OWASP / MITRE references" },
+  { v: "3", l: "Security domains unified" },
+  { v: "0", l: "Agents to install" },
+];
+
+const CHAIN = [
+  { Icon: Globe,    l: "L1", t: "Web injection",      d: "Reflected input on a public field" },
+  { Icon: Bot,      l: "L2", t: "Prompt injection",   d: "Payload steers the model" },
+  { Icon: Database, l: "L3", t: "RAG poisoning",       d: "Adversarial doc enters the corpus" },
+  { Icon: Wrench,   l: "L4", t: "Tool-call hijack",    d: "Agent invokes an internal action" },
+  { Icon: Radar,    l: "L5", t: "Network pivot",       d: "Lateral movement to internal data" },
+];
+
+const COMPARE = [
+  { tool: "Burp / ZAP", web: true, llm: false, net: false, chain: false },
+  { tool: "Garak / PyRIT", web: false, llm: true, net: false, chain: false },
+  { tool: "Nessus / Metasploit", web: false, llm: false, net: true, chain: false },
+  { tool: "ARGUS", web: true, llm: true, net: true, chain: true, me: true },
+];
+
 const APART = [
   { n: "01", title: "Reasons across layers", body: "Most scanners look at one domain. ARGUS correlates findings across all eight into emergent kill-chains — the attacks that only appear between tools." },
   { n: "02", title: "Built for AI threats", body: "Purpose-built for LLM, RAG, MCP/agentic and multi-agent risks. Not a web scanner with an AI checkbox bolted on." },
@@ -30,8 +52,11 @@ const APART = [
 
 function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   return (
-    <motion.div className={className} initial={{ opacity: 0, y: 44 }} whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.8, delay, ease: [0.16, 1, 0.3, 1] }}>
+    <motion.div className={className}
+      initial={{ opacity: 0, y: 56, filter: "blur(6px)" }}
+      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "-90px" }}
+      transition={{ duration: 0.85, delay, ease: [0.16, 1, 0.3, 1] }}>
       {children}
     </motion.div>
   );
@@ -81,16 +106,18 @@ export function Landing({ onEnter }: Props) {
 
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, -120]);
-  const heroFade = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, -160]);
+  const heroFade = useTransform(scrollYProgress, [0, 0.55], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.6], [1, 1.12]);
 
   return (
     <div ref={ref} className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-5 border-b border-line/10 bg-bg/80 backdrop-blur-xl">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             className="font-black tracking-tight text-2xl">ARGUS</button>
+          <span className="hidden sm:block w-px h-5 bg-line/20" />
           <span className="hidden sm:block font-mono text-[11px] tracking-[0.2em] text-text-muted">{clock || "--:--"} · GLOBAL</span>
         </div>
         <div className="flex items-center gap-7 text-xs font-medium tracking-[0.18em]">
@@ -205,6 +232,86 @@ export function Landing({ onEnter }: Props) {
             </Reveal>
           ))}
         </div>
+      </Section>
+
+      {/* ── STATS BAND ── */}
+      <section className="relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
+        <div className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
+          {STATS.map((s, i) => (
+            <Reveal key={s.l} delay={i * 0.06} className="text-center">
+              <p className="font-serif-display text-6xl md:text-8xl leading-none text-accent">{s.v}</p>
+              <p className="text-text-muted text-sm mt-3">{s.l}</p>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── ATTACK-CHAIN SHOWCASE ── */}
+      <Section id="chain">
+        <Reveal>
+          <p className="text-accent text-xs font-mono uppercase tracking-[0.25em]">The emergent threat</p>
+          <h2 className="mt-5 font-serif-display text-4xl md:text-7xl leading-[1.05] max-w-4xl">
+            One chain. Five layers.<br /><span className="serif-italic">Zero tools that catch it.</span>
+          </h2>
+        </Reveal>
+        <div className="mt-16 grid md:grid-cols-5 gap-3">
+          {CHAIN.map((c, i) => (
+            <Reveal key={c.l} delay={i * 0.08}>
+              <div className="relative h-full p-6 rounded-2xl border border-line/15 bg-surface/60">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center mb-6">
+                  <c.Icon className="w-5 h-5 text-accent" />
+                </div>
+                <span className="font-mono text-xs text-accent">{c.l}</span>
+                <p className="font-semibold mt-1">{c.t}</p>
+                <p className="text-text-muted text-xs mt-2 leading-relaxed">{c.d}</p>
+                {i < CHAIN.length - 1 && (
+                  <ArrowRight className="hidden md:block absolute top-1/2 -right-2.5 w-4 h-4 text-accent/50 -translate-y-1/2" />
+                )}
+              </div>
+            </Reveal>
+          ))}
+        </div>
+        <Reveal delay={0.1}>
+          <div className="mt-8 flex flex-wrap gap-6 font-mono text-sm text-text-muted">
+            <span>Exploitability <span className="text-accent">0.89</span></span>
+            <span>Impact <span className="text-accent">0.94</span></span>
+            <span>Novelty <span className="text-accent">0.81</span></span>
+            <span>Priority <span className="text-accent">0.91</span></span>
+          </div>
+        </Reveal>
+      </Section>
+
+      {/* ── COMPARISON ── */}
+      <Section id="compare">
+        <Reveal>
+          <p className="text-accent text-xs font-mono uppercase tracking-[0.25em]">The gap</p>
+          <h2 className="mt-5 font-serif-display text-4xl md:text-6xl max-w-3xl">Why siloed tools miss the real risk.</h2>
+        </Reveal>
+        <Reveal delay={0.1}>
+          <div className="mt-12 max-w-4xl border border-line/15 rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line/15 text-text-muted font-mono text-xs">
+                  <th className="text-left px-5 py-4 font-normal">Tool</th>
+                  <th className="px-3 py-4 font-normal">Web</th><th className="px-3 py-4 font-normal">LLM</th>
+                  <th className="px-3 py-4 font-normal">Network</th><th className="px-3 py-4 font-normal">Cross-layer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARE.map((r) => (
+                  <tr key={r.tool} className={`border-b border-line/10 last:border-0 ${r.me ? "bg-accent/5" : ""}`}>
+                    <td className={`px-5 py-4 font-mono ${r.me ? "text-accent font-bold" : "text-text-secondary"}`}>{r.tool}</td>
+                    {[r.web, r.llm, r.net, r.chain].map((v, j) => (
+                      <td key={j} className="px-3 py-4 text-center">
+                        {v ? <Check className="w-4 h-4 text-accent mx-auto" /> : <X className="w-4 h-4 text-text-muted/40 mx-auto" />}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Reveal>
       </Section>
 
       {/* ── MODES ── */}
