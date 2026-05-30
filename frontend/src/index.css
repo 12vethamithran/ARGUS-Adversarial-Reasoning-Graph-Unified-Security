@@ -244,6 +244,30 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 @keyframes halftone-shift { from { background-position: 0 0; } to { background-position: 14px 0; } }
 .halftone-text { animation: halftone-shift 8s linear infinite; }
 
+/* Halftone "breathing" — dot size + glow pulse on the giant ARGUS word */
+@keyframes halftone-breathe {
+  0%, 100% { background-size: 7px 7px; filter: drop-shadow(0 0 0 transparent); }
+  50%      { background-size: 8.5px 8.5px; filter: drop-shadow(0 0 26px rgb(var(--accent) / 0.18)); }
+}
+.halftone-breathe { animation: halftone-shift 8s linear infinite, halftone-breathe 7s ease-in-out infinite; }
+
+/* Per-letter rise used by the JS-split headline */
+@keyframes letter-rise { from { transform: translateY(110%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Accent underline sweep for emphasised words */
+@keyframes underline-sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.sweep-underline { position: relative; }
+.sweep-underline::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0.06em; height: 3px;
+  background: rgb(var(--accent)); transform: scaleX(0); transform-origin: left;
+}
+.sweep-underline.in::after { animation: underline-sweep 0.7s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .halftone-text, .halftone-breathe, .aurora, .ascii-hero { animation: none !important; }
+}
+
 /* Animated aurora background for the landing hero */
 @keyframes aurora-drift {
   0%   { transform: translate(0,0) scale(1); }

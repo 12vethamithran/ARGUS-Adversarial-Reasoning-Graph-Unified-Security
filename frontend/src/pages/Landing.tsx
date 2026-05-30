@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
@@ -49,6 +49,27 @@ const APART = [
   { n: "02", title: "Built for AI threats", body: "Purpose-built for LLM, RAG, MCP/agentic and multi-agent risks. Not a web scanner with an AI checkbox bolted on." },
   { n: "03", title: "Validates in the open", body: "A sandboxed, whitelisted recon terminal to confirm findings live against the target — exploit and destructive flags blocked." },
 ];
+
+// Headline whose words clip-reveal upward, one after another, on scroll into view.
+function WordReveal({ text, className }: { text: string; className?: string }) {
+  const words = text.split(" ");
+  return (
+    <h2 className={className} aria-label={text}>
+      {words.map((w, i) =>
+        w === "\n" ? <br key={i} /> : (
+          <span key={i} className="inline-block overflow-hidden align-bottom mr-[0.25em]">
+            <motion.span className="inline-block"
+              initial={{ y: "110%" }}
+              whileInView={{ y: 0 }}
+              viewport={{ once: true, margin: "-90px" }}
+              transition={{ duration: 0.75, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
+              dangerouslySetInnerHTML={{ __html: w }} />
+          </span>
+        ),
+      )}
+    </h2>
+  );
+}
 
 function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   return (
@@ -106,9 +127,11 @@ export function Landing({ onEnter }: Props) {
 
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, -160]);
-  const heroFade = useTransform(scrollYProgress, [0, 0.55], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 0.6], [1, 1.12]);
+  // Spring-smoothed progress => buttery parallax that eases instead of snapping to scroll.
+  const sp = useSpring(scrollYProgress, { stiffness: 80, damping: 24, mass: 0.4 });
+  const heroY = useTransform(sp, [0, 1], [0, -170]);
+  const heroFade = useTransform(sp, [0, 0.55], [1, 0]);
+  const heroScale = useTransform(sp, [0, 0.6], [1, 1.14]);
 
   return (
     <div ref={ref} className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
@@ -133,8 +156,17 @@ export function Landing({ onEnter }: Props) {
       {/* ── HERO (Furo dithered word + serif overlay) ── */}
       <header className="relative px-6 md:px-10 pt-10 pb-20 max-w-[1600px] mx-auto min-h-[92vh] flex flex-col">
         <motion.div style={{ y: heroY, opacity: heroFade, scale: heroScale }} aria-hidden
-          className="halftone-text absolute inset-x-4 md:inset-x-10 top-2 text-[24vw] leading-[0.8] pointer-events-none select-none origin-top">
-          ARGUS
+          className="absolute inset-x-4 md:inset-x-10 top-2 flex justify-between pointer-events-none select-none origin-top">
+          {"ARGUS".split("").map((ch, i) => (
+            <motion.span key={i}
+              className="halftone-text halftone-breathe text-[24vw] leading-[0.8] inline-block"
+              initial={{ y: "18%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 + i * 0.09, duration: 1, ease: [0.16, 1, 0.3, 1] }}
+              whileHover={{ scale: 1.06, color: "rgb(var(--accent))" }}>
+              {ch}
+            </motion.span>
+          ))}
         </motion.div>
 
         {/* headline anchored to lower third, well clear of the dithered word */}
@@ -166,11 +198,9 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── PROBLEM BAND ── */}
       <section className="relative px-6 md:px-10 py-28 border-t border-line/10 max-w-[1600px] mx-auto">
-        <Reveal>
-          <h2 className="font-serif-display text-4xl md:text-7xl leading-[1.05] max-w-4xl">
-            Your stack is layered.<br />Your scanners <span className="serif-italic">aren't.</span>
-          </h2>
-        </Reveal>
+        <WordReveal
+          className="font-serif-display text-4xl md:text-7xl leading-[1.15] max-w-4xl"
+          text={'Your stack is layered. \n Your scanners <span class="serif-italic">aren't.</span>'} />
         <div className="mt-16 grid md:grid-cols-2 gap-12 items-center">
           <Reveal><Particles /></Reveal>
           <Reveal delay={0.1} className="space-y-6 text-text-secondary text-lg leading-relaxed max-w-lg">
