@@ -63,7 +63,7 @@ function WordReveal({ tokens, className }: { tokens: Token[]; className?: string
         const word = isAccent ? t.w : t;
         const delay = idx++ * 0.06;
         return (
-          <span key={i} className="inline-block overflow-hidden align-bottom mr-[0.25em]">
+          <span key={i} className="inline-block overflow-hidden align-bottom mr-[0.25em] pb-[0.12em]">
             <motion.span className={`inline-block ${isAccent ? "serif-italic" : ""}`}
               initial={{ y: "110%" }}
               whileInView={{ y: 0 }}
@@ -162,15 +162,8 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── HERO (Furo dithered word + serif overlay) ── */}
       <header className="relative px-6 md:px-10 pt-10 pb-20 max-w-[1600px] mx-auto min-h-[92vh] flex flex-col">
-        {/* eyebrow / mini theme tag */}
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="relative z-10 inline-flex self-start items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-          AI RED-TEAM REASONING · 8 CROSS-DOMAIN LAYERS
-        </motion.div>
-
         <motion.div style={{ y: heroY, opacity: heroFade, scale: heroScale }} aria-hidden
-          className="absolute inset-x-4 md:inset-x-10 top-16 md:top-20 flex justify-between pointer-events-none select-none origin-top">
+          className="absolute inset-x-4 md:inset-x-10 top-2 flex justify-between pointer-events-none select-none origin-top">
           {"ARGUS".split("").map((ch, i) => (
             <motion.span key={i}
               className="halftone-text halftone-breathe text-[24vw] leading-[0.8] inline-block"
@@ -212,11 +205,18 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── PROBLEM BAND ── */}
       <section className="relative px-6 md:px-10 py-28 border-t border-line/10 max-w-[1600px] mx-auto">
+        {/* mini theme tag */}
+        <Reveal>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+            THE PROBLEM · CROSS-LAYER BLIND SPOTS
+          </div>
+        </Reveal>
         <WordReveal
-          className="font-serif-display text-4xl md:text-7xl leading-[1.15] max-w-4xl"
+          className="font-serif-display text-4xl md:text-7xl leading-[1.2] max-w-4xl"
           tokens={["Your", "stack", "is", "layered.", "\n", "Your", "scanners", { w: "aren't.", accent: true }]} />
         <Reveal delay={0.15}>
-          <p className="mt-6 text-text-secondary text-lg md:text-xl leading-relaxed max-w-2xl">
+          <p className="mt-10 text-text-secondary text-lg md:text-xl leading-relaxed max-w-2xl">
             Eight attack surfaces, eight blind spots — and the attacker only needs the seam between two of them.
           </p>
         </Reveal>
