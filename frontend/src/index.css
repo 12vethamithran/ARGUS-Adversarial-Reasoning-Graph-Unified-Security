@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700;1,900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -41,58 +41,58 @@
 }
 
 [data-theme="basic"] {
-  /* ── Basic: clean indigo-blue (analogous to violet Advanced) ─ */
-  color-scheme: light;
-  --bg:            244 246 255;    /* #f4f6ff */
-  --surface:       255 255 255;    /* #ffffff */
-  --raised:        240 242 254;    /* #f0f2fe */
-  --overlay:       226 230 251;    /* #e2e6fb */
-  --border:        49 46 129;      /* indigo, low alpha */
-  --border-alpha:  0.15;
+  /* ── Basic: Furo black + electric blue ───────────────────── */
+  color-scheme: dark;
+  --bg:            0 0 0;          /* pure black */
+  --surface:       14 14 14;       /* #0e0e0e */
+  --raised:        21 21 21;       /* #151515 */
+  --overlay:       30 30 30;       /* #1e1e1e */
+  --border:        255 255 255;    /* hairline white, low alpha */
+  --border-alpha:  0.12;
 
-  --text:          21 24 56;       /* #151838 */
-  --text-secondary:62 67 110;      /* #3e436e */
-  --text-muted:    118 122 160;    /* #767aa0 */
+  --text:          245 245 245;    /* #f5f5f5 */
+  --text-secondary:168 168 168;    /* #a8a8a8 */
+  --text-muted:    110 110 110;    /* #6e6e6e */
 
-  --accent:        79 70 229;      /* #4f46e5 indigo-600 */
-  --accent-strong: 37 99 235;      /* #2563eb blue-600 */
+  --accent:        56 132 255;     /* #3884ff electric blue */
+  --accent-strong: 37 99 235;      /* #2563eb */
   --accent-contrast: 255 255 255;
 
-  --node-discovered:  148 163 184;
+  --node-discovered:  110 110 110;
   --node-probing:     245 158 11;
-  --node-exploitable: 239 68 68;
-  --node-chained:     79 70 229;
+  --node-exploitable: 255 61 18;
+  --node-chained:     56 132 255;
 
-  --grid-line:     79 70 229;
-  --glow:          79 70 229;
+  --grid-line:     255 255 255;
+  --glow:          56 132 255;
 }
 
 [data-theme="landing"] {
-  /* ── Landing: deep dark, violet → blue → magenta accents ─── */
+  /* ── Landing: Furo pure black + orange-red ───────────────── */
   color-scheme: dark;
-  --bg:            10 11 20;         /* #0a0b14 near-black navy */
-  --surface:       17 19 33;         /* #111321 */
-  --raised:        24 27 45;         /* #181b2d */
-  --overlay:       34 38 64;         /* #222640 */
-  --border:        148 163 220;      /* cool slate, low alpha */
-  --border-alpha:  0.14;
+  --bg:            0 0 0;            /* pure black */
+  --surface:       14 14 14;         /* #0e0e0e */
+  --raised:        21 21 21;         /* #151515 */
+  --overlay:       30 30 30;         /* #1e1e1e */
+  --border:        255 255 255;      /* hairline white, low alpha */
+  --border-alpha:  0.13;
 
-  --text:          237 240 252;      /* #edf0fc */
-  --text-secondary:166 175 209;      /* #a6afd1 */
-  --text-muted:    113 122 158;      /* #717a9e */
+  --text:          245 245 245;      /* #f5f5f5 */
+  --text-secondary:168 168 168;      /* #a8a8a8 */
+  --text-muted:    110 110 110;      /* #6e6e6e */
 
-  /* Neutral landing accent = violet; Landing.tsx swaps to blue/magenta on hover */
-  --accent:        139 122 255;      /* #8b7aff periwinkle-violet */
-  --accent-strong: 217 70 239;       /* #d946ef fuchsia */
+  /* Neutral landing accent = Furo orange-red; modes swap blue/orange on hover */
+  --accent:        255 61 18;        /* #ff3d12 */
+  --accent-strong: 217 45 10;        /* #d92d0a */
   --accent-contrast: 255 255 255;
 
-  --node-discovered:  148 163 184;
+  --node-discovered:  110 110 110;
   --node-probing:     245 158 11;
-  --node-exploitable: 244 63 94;
-  --node-chained:     139 122 255;
+  --node-exploitable: 255 61 18;
+  --node-chained:     255 120 60;
 
-  --grid-line:     139 122 255;
-  --glow:          139 122 255;
+  --grid-line:     255 255 255;
+  --glow:          255 61 18;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -210,12 +210,39 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 .text-balance { text-wrap: balance; }
 .display-tight { letter-spacing: -0.04em; line-height: 0.92; }
 
-/* Analogous blue → violet → magenta gradient text */
-.gradient-spectrum {
-  background: linear-gradient(100deg, #4f46e5, #7c3aed 45%, #d946ef);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* Accent text (Furo: solid orange-red / mode accent) */
+.gradient-spectrum { color: rgb(var(--accent)); }
+
+/* ── Furo serif display ────────────────────────── */
+.font-serif-display { font-family: 'Playfair Display', Georgia, serif; }
+.font-serif-text { font-family: 'Instrument Serif', Georgia, serif; }
+.serif-italic { font-family: 'Playfair Display', Georgia, serif; font-style: italic; color: rgb(var(--accent)); }
+
+/* ── ASCII / dither hero text ──────────────────── */
+.ascii-hero {
+  font-family: 'JetBrains Mono', monospace;
+  color: rgb(var(--text) / 0.18);
+  white-space: pre;
+  line-height: 0.78;
+  letter-spacing: 0.08em;
+  user-select: none;
 }
+@keyframes ascii-flicker { 0%,100%{opacity:.18} 50%{opacity:.28} }
+.ascii-hero { animation: ascii-flicker 6s ease-in-out infinite; }
+
+/* Giant dotted/halftone word (Furo dithered-letters look) */
+.halftone-text {
+  font-family: 'Inter', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: transparent;
+  background-image: radial-gradient(rgb(var(--text) / 0.55) 1px, transparent 1.6px);
+  background-size: 7px 7px;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@keyframes halftone-shift { from { background-position: 0 0; } to { background-position: 14px 0; } }
+.halftone-text { animation: halftone-shift 8s linear infinite; }
 
 /* Animated aurora background for the landing hero */
 @keyframes aurora-drift {
