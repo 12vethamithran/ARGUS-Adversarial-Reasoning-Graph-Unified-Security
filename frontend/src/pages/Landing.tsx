@@ -6,9 +6,9 @@ import {
 } from "lucide-react";
 
 const ACCENTS = {
-  neutral:  { a: "255 61 18",  s: "217 45 10" },   // Furo orange-red
-  basic:    { a: "56 132 255", s: "37 99 235" },   // electric blue
-  advanced: { a: "255 61 18",  s: "217 45 10" },   // orange-red
+  neutral:  { a: "255 61 18", s: "217 45 10" },   // Furo orange-red
+  basic:    { a: "255 61 18", s: "217 45 10" },   // mono — orange-red everywhere
+  advanced: { a: "255 61 18", s: "217 45 10" },
 };
 
 const LAYERS = [
@@ -212,7 +212,7 @@ export function Landing({ onEnter }: Props) {
         <Reveal><p className="text-accent text-xs font-mono uppercase tracking-[0.25em]">Choose your depth</p></Reveal>
         <div className="mt-10 grid md:grid-cols-2 gap-5">
           <ModeCard onHover={() => setMode("basic")} onLeave={() => setMode("neutral")} onClick={onEnter}
-            accent="56 132 255" Icon={GraduationCap} name="Basic" tag="3 layers · quick assessment"
+            accent="255 61 18" Icon={GraduationCap} name="Basic" tag="3 layers · quick assessment"
             points={["Web surface · LLM probe · RAG poisoning", "Top chains + one-page report", "No configuration required"]} ideal="Students, quick assessments" />
           <ModeCard onHover={() => setMode("advanced")} onLeave={() => setMode("neutral")} onClick={onEnter}
             accent="255 61 18" Icon={Crosshair} name="Advanced" tag="8 layers · full red team"
