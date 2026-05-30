@@ -68,36 +68,36 @@
 }
 
 [data-theme="landing"] {
-  /* ── Landing: bright analogous blue → violet → magenta ───── */
-  color-scheme: light;
-  --bg:            246 245 253;     /* #f6f5fd lavender-white */
-  --surface:       255 255 255;     /* #ffffff */
-  --raised:        242 240 252;     /* #f2f0fc */
-  --overlay:       233 229 251;     /* #e9e5fb */
-  --border:        124 58 237;      /* violet, low alpha */
-  --border-alpha:  0.16;
+  /* ── Landing: deep dark, violet → blue → magenta accents ─── */
+  color-scheme: dark;
+  --bg:            10 11 20;         /* #0a0b14 near-black navy */
+  --surface:       17 19 33;         /* #111321 */
+  --raised:        24 27 45;         /* #181b2d */
+  --overlay:       34 38 64;         /* #222640 */
+  --border:        148 163 220;      /* cool slate, low alpha */
+  --border-alpha:  0.14;
 
-  --text:          26 22 51;        /* #1a1633 deep indigo */
-  --text-secondary:76 68 112;       /* #4c4470 */
-  --text-muted:    135 128 168;     /* #8780a8 */
+  --text:          237 240 252;      /* #edf0fc */
+  --text-secondary:166 175 209;      /* #a6afd1 */
+  --text-muted:    113 122 158;      /* #717a9e */
 
   /* Neutral landing accent = violet; Landing.tsx swaps to blue/magenta on hover */
-  --accent:        124 58 237;      /* #7c3aed violet-600 */
-  --accent-strong: 217 70 239;      /* #d946ef fuchsia-500 */
+  --accent:        139 122 255;      /* #8b7aff periwinkle-violet */
+  --accent-strong: 217 70 239;       /* #d946ef fuchsia */
   --accent-contrast: 255 255 255;
 
   --node-discovered:  148 163 184;
   --node-probing:     245 158 11;
   --node-exploitable: 244 63 94;
-  --node-chained:     168 85 247;
+  --node-chained:     139 122 255;
 
-  --grid-line:     124 58 237;
-  --glow:          124 58 237;
+  --grid-line:     139 122 255;
+  --glow:          139 122 255;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { background: rgb(var(--bg)); }
+html { background: rgb(var(--bg)); scroll-behavior: smooth; }
 
 body {
   background: rgb(var(--bg));
@@ -224,6 +224,41 @@ input[type=range] { accent-color: rgb(var(--accent)); }
   100% { transform: translate(0,0) scale(1); }
 }
 .aurora { animation: aurora-drift 14s ease-in-out infinite; will-change: transform; }
+
+/* ── Editor metaphor (imflorea-style) ──────────────
+   Vertical ruler lines + selection box with corner handles. */
+.editor-rules {
+  background-image:
+    linear-gradient(90deg, rgb(var(--grid-line) / 0.06) 1px, transparent 1px);
+  background-size: 19% 100%;
+}
+.sel-box { position: relative; border: 1px solid rgb(var(--accent) / 0.55); border-radius: 2px; }
+.sel-box::before, .sel-box::after,
+.sel-box > .h-tl, .sel-box > .h-tr, .sel-box > .h-bl, .sel-box > .h-br { content: none; }
+.sel-handle {
+  position: absolute; width: 9px; height: 9px; border-radius: 2px;
+  background: rgb(var(--bg)); border: 1.5px solid rgb(var(--accent));
+}
+.sel-handle.tl { top: -5px; left: -5px; } .sel-handle.tr { top: -5px; right: -5px; }
+.sel-handle.bl { bottom: -5px; left: -5px; } .sel-handle.br { bottom: -5px; right: -5px; }
+.sel-tag {
+  position: absolute; top: -22px; left: -1px; font: 600 10px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.05em; color: rgb(var(--accent-contrast));
+  background: rgb(var(--accent)); padding: 3px 6px; border-radius: 3px;
+}
+
+/* Multiplayer cursor labels */
+.mp-cursor { position: absolute; display: flex; align-items: flex-start; gap: 4px; pointer-events: none; }
+.mp-tag { font: 600 10px/1 'JetBrains Mono', monospace; color: #fff; padding: 3px 6px; border-radius: 4px; transform: translateY(4px); }
+
+/* Floating bob for cursors */
+@keyframes bob1 { 0%,100%{ transform: translate(0,0);} 50%{ transform: translate(10px,-14px);} }
+@keyframes bob2 { 0%,100%{ transform: translate(0,0);} 50%{ transform: translate(-12px,10px);} }
+.bob1 { animation: bob1 6s ease-in-out infinite; }
+.bob2 { animation: bob2 7s ease-in-out infinite; }
+
+/* Dither-pixel reveal for the second word */
+@keyframes dither-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* Mode-reactive accent: Landing overrides --accent/--glow inline; this just
    makes the transition smooth as the user hovers Basic / Advanced. */

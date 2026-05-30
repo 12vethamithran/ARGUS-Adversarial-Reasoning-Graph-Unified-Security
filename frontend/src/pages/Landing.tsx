@@ -1,13 +1,12 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
   Eye, Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
-  ArrowRight, ArrowUpRight, Check, GraduationCap, Crosshair, Network, ShieldAlert,
+  ArrowRight, ArrowDown, Search, Cloud, Users2, GraduationCap, Crosshair, Check, Quote,
 } from "lucide-react";
 
-// Analogous spectrum: indigo/blue (Basic) → violet → magenta (Advanced).
 const ACCENTS = {
-  neutral:  { a: "124 58 237",  s: "217 70 239", g: "124 58 237" },
+  neutral:  { a: "139 122 255", s: "217 70 239", g: "139 122 255" },
   basic:    { a: "79 70 229",   s: "37 99 235",  g: "79 70 229"  },
   advanced: { a: "168 85 247",  s: "217 70 239", g: "168 85 247" },
 };
@@ -23,51 +22,33 @@ const LAYERS = [
   { id: 8, Icon: KeyRound, label: "Identity / OAuth", std: "MITRE ATLAS" },
 ];
 
-// Salo-style "services" — four capability cards.
-const SERVICES = [
-  { Icon: Network, title: "Cross-layer reasoning", body: "Correlates findings across eight domains into emergent kill-chains no single scanner can detect.", tag: "Engine" },
-  { Icon: ShieldAlert, title: "Attack-chain modeling", body: "Models how a web injection feeds an LLM that poisons a RAG corpus that hijacks an agent.", tag: "Graph" },
-  { Icon: Bot, title: "AI-native coverage", body: "Purpose-built for LLM, RAG, MCP/agentic and multi-agent threats — not bolted onto a web scanner.", tag: "AI/LLM" },
-  { Icon: Crosshair, title: "Authorized recon", body: "A sandboxed, whitelisted terminal to validate findings live — exploit and destructive flags blocked.", tag: "Terminal" },
-];
-
 const STEPS = [
   { n: "01", title: "Define the target", desc: "A URL, an LLM endpoint, or a plain-text description. No agents to install." },
   { n: "02", title: "Scan every layer",  desc: "Up to 8 attack layers run in parallel across web, AI, and infrastructure." },
-  { n: "03", title: "Reason across them", desc: "Findings are correlated into emergent kill-chains no single tool can see." },
+  { n: "03", title: "Reason across them", desc: "Findings correlate into emergent kill-chains no single tool can see." },
   { n: "04", title: "Get the report",    desc: "Prioritized chains, remediations, and HTML / PDF / STIX 2.1 exports." },
 ];
 
-const STATS = [
-  { v: "8", l: "Attack layers" },
-  { v: "24+", l: "OWASP / MITRE IDs" },
-  { v: "3", l: "Security domains unified" },
-  { v: "0", l: "Agents to install" },
-];
-
-// ── Motion helpers ───────────────────────────────────────────────────────────
-function Words({ text, className }: { text: string; className?: string }) {
-  return (
-    <span className={className}>
-      {text.split(" ").map((w, i) => (
-        <span key={i} className="inline-block overflow-hidden align-bottom">
-          <motion.span className="inline-block" initial={{ y: "110%" }} animate={{ y: 0 }}
-            transition={{ delay: 0.15 + i * 0.07, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-            {w}&nbsp;
-          </motion.span>
-        </span>
-      ))}
-    </span>
-  );
-}
+const AGENT_CHIPS = ["what's your stack?", "show me a chain", "which layers run?", "/help"];
 
 function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   return (
-    <motion.div className={className} initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }}
+    <motion.div className={className} initial={{ opacity: 0, y: 44 }} whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}>
       {children}
     </motion.div>
   );
+}
+
+function useClock() {
+  const [t, setT] = useState("");
+  useEffect(() => {
+    const fmt = () => new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+    setT(fmt());
+    const id = setInterval(() => setT(fmt()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return t;
 }
 
 interface Props { onEnter: () => void }
@@ -76,165 +57,186 @@ export function Landing({ onEnter }: Props) {
   const [mode, setMode] = useState<keyof typeof ACCENTS>("neutral");
   const acc = ACCENTS[mode];
   const rootStyle = { "--accent": acc.a, "--accent-strong": acc.s, "--glow": acc.g } as CSSProperties;
+  const clock = useClock();
+  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase().replace(/ /g, "/");
 
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const gA = useTransform(scrollYProgress, [0, 1], [0, 240]);
-  const gB = useTransform(scrollYProgress, [0, 1], [0, -180]);
-  const gFade = useTransform(scrollYProgress, [0, 1], [1, 0.1]);
+  const gA = useTransform(scrollYProgress, [0, 1], [0, 220]);
+  const gFade = useTransform(scrollYProgress, [0, 1], [1, 0.12]);
 
   return (
     <div ref={ref} className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
-      {/* ── Aurora background: blue → violet → magenta ── */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <motion.div style={{ y: gA, opacity: gFade }} className="aurora absolute -top-48 -left-40 w-[760px] h-[760px] rounded-full"
-          children={<div className="w-full h-full rounded-full transition-opacity duration-700"
-            style={{ background: "radial-gradient(circle, rgba(79,70,229,0.22) 0%, transparent 70%)", opacity: mode === "advanced" ? 0.35 : 1 }} />} />
-        <motion.div style={{ y: gB, opacity: gFade }} className="aurora absolute top-0 -right-40 w-[800px] h-[800px] rounded-full"
-          children={<div className="w-full h-full rounded-full transition-opacity duration-700"
-            style={{ background: "radial-gradient(circle, rgba(217,70,239,0.20) 0%, transparent 70%)", opacity: mode === "basic" ? 0.35 : 1 }} />} />
-        <motion.div style={{ opacity: gFade }} className="aurora absolute top-[28%] left-1/3 w-[620px] h-[620px] rounded-full"
-          children={<div className="w-full h-full rounded-full" style={{ background: "radial-gradient(circle, rgba(124,58,237,0.16) 0%, transparent 70%)" }} />} />
-        <div className="absolute inset-0 grid-bg opacity-40" />
+      {/* Aurora + editor ruler background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <motion.div style={{ y: gA, opacity: gFade }} className="aurora absolute -top-40 -left-32 w-[680px] h-[680px] rounded-full"
+          children={<div className="w-full h-full rounded-full" style={{ background: "radial-gradient(circle, rgba(139,122,255,0.16) 0%, transparent 70%)" }} />} />
+        <motion.div style={{ opacity: gFade }} className="aurora absolute top-10 -right-40 w-[720px] h-[720px] rounded-full"
+          children={<div className="w-full h-full rounded-full" style={{ background: "radial-gradient(circle, rgba(217,70,239,0.12) 0%, transparent 70%)" }} />} />
+        <div className="absolute inset-0 editor-rules opacity-100" />
       </div>
 
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-5 border-b border-line/10 bg-bg/70 backdrop-blur-xl">
-        <div className="flex items-center gap-2.5">
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg border border-accent/40 flex items-center justify-center bg-accent/10">
             <Eye className="w-4 h-4 text-accent" strokeWidth={2.2} />
           </div>
           <span className="font-mono font-bold tracking-[0.22em] text-sm">ARGUS</span>
-        </div>
-        <div className="hidden md:flex items-center gap-8 text-sm text-text-secondary">
-          <a href="#capabilities" className="hover:text-text-primary transition-colors">Capabilities</a>
-          <a href="#layers" className="hover:text-text-primary transition-colors">Layers</a>
-          <a href="#process" className="hover:text-text-primary transition-colors">Process</a>
-          <a href="#modes" className="hover:text-text-primary transition-colors">Modes</a>
+        </button>
+        <div className="hidden md:flex items-center gap-10 text-sm font-medium">
+          <a href="#layers" className="flex items-start gap-0.5 hover:text-accent transition-colors">LAYERS <sup className="text-accent text-[10px]">8</sup></a>
+          <a href="#process" className="flex items-start gap-0.5 hover:text-accent transition-colors">PROCESS <sup className="text-accent text-[10px]">4</sup></a>
+          <a href="#modes" className="hover:text-accent transition-colors">MODES</a>
         </div>
         <button onClick={onEnter}
-          className="group flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent text-[rgb(var(--accent-contrast))] text-sm font-medium hover:opacity-90 transition-all">
-          Launch <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
+          LAUNCH <Search className="w-4 h-4" />
+          <span className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-text-muted">
+            <kbd className="px-1.5 py-0.5 rounded border border-line/25">CTRL</kbd>+<kbd className="px-1.5 py-0.5 rounded border border-line/25">K</kbd>
+          </span>
         </button>
       </nav>
 
-      {/* ── HERO ── */}
-      <header className="relative z-10 px-6 md:px-10 pt-24 md:pt-32 pb-16 max-w-[1500px] mx-auto">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono mb-10">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-          AI Red-Team Reasoning · 8 Cross-Domain Layers
-        </motion.div>
+      {/* ── HERO (editor metaphor) ── */}
+      <header className="relative z-10 px-6 md:px-10 pt-10 pb-20 max-w-[1500px] mx-auto">
+        {/* meta bar */}
+        <div className="flex items-center gap-3 text-[11px] font-mono tracking-widest text-text-muted">
+          <span>ARGUS</span><span className="opacity-40">/</span>
+          <span>{clock || "—"}</span><span className="opacity-40">/</span>
+          <span>{today}</span>
+        </div>
+        <div className="mt-3 flex items-center gap-4">
+          <span className="flex items-center gap-1.5 text-sm font-mono text-text-secondary"><Cloud className="w-4 h-4 text-accent" /> 8 layers</span>
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-line/20 bg-surface/60 text-xs font-mono">
+            <Users2 className="w-3.5 h-3.5 text-accent" /> COLLAB ON <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+          </span>
+        </div>
 
-        <h1 className="display-tight text-balance font-black text-[14vw] md:text-[9.5rem] leading-[0.86]">
-          <Words text="SEES EVERY" />
-          <br />
-          <span className="gradient-spectrum"><Words text="ATTACK CHAIN" /></span>
-        </h1>
+        {/* selection-boxed headline + side cursors */}
+        <div className="relative mt-10 grid lg:grid-cols-[1.5fr_1fr] gap-10 items-start">
+          <div className="relative">
+            {/* multiplayer cursors */}
+            <div className="mp-cursor bob1" style={{ top: "-26px", left: "-4px" }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="rgb(var(--accent))"><path d="M0 0l5 16 3-7 7-3z"/></svg>
+              <span className="mp-tag" style={{ background: "rgb(var(--accent))" }}>You</span>
+            </div>
+            <div className="mp-cursor bob2" style={{ bottom: "-10px", right: "8%" }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="#f97316"><path d="M0 0l5 16 3-7 7-3z"/></svg>
+              <span className="mp-tag" style={{ background: "#f97316" }}>ARGUS</span>
+            </div>
 
-        <div className="mt-12 grid md:grid-cols-[1.25fr_1fr] gap-10 items-end">
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-            className="text-text-secondary text-xl md:text-2xl leading-snug max-w-2xl text-balance">
-            Security reasoning that feels unified, not bolted together. ARGUS models how a{" "}
-            <span className="text-text-primary">web injection</span> feeds an <span className="text-text-primary">LLM</span> that
-            poisons a <span className="text-text-primary">RAG corpus</span> that hijacks an{" "}
-            <span className="text-text-primary">agent</span> — across eight layers as one campaign.
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}
+              className="sel-box px-3 py-2">
+              <span className="sel-tag">Text</span>
+              <span className="sel-handle tl" /><span className="sel-handle tr" /><span className="sel-handle bl" /><span className="sel-handle br" />
+              <h1 className="display-tight font-black text-[13vw] lg:text-[8.5rem] leading-[0.82] tracking-tight">ARGUS</h1>
+            </motion.div>
+
+            {/* dither second word */}
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 1 }}
+              className="mt-8 gradient-spectrum display-tight font-black text-[10vw] lg:text-[6rem] leading-none select-none"
+              style={{ filter: "blur(0.4px)" }}>
+              sees all
+            </motion.p>
+          </div>
+
+          <motion.p initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
+            className="text-text-secondary text-lg md:text-xl leading-relaxed lg:pt-6 max-w-md">
+            Adversarial reasoning across <span className="text-text-primary">8 attack layers</span>. ARGUS models how a web
+            injection feeds an LLM that poisons a RAG corpus that hijacks an agent — surfacing the cross-layer chains no
+            single tool can see.
           </motion.p>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-            className="flex flex-col sm:flex-row md:flex-col gap-3">
-            <button onClick={onEnter}
-              className="group flex items-center justify-between gap-3 px-6 py-4 rounded-2xl bg-accent text-[rgb(var(--accent-contrast))] font-medium hover:opacity-90 transition-all">
-              Start Analysis <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button onClick={onEnter}
-              className="group flex items-center justify-between gap-3 px-6 py-4 rounded-2xl border border-line/20 hover:border-accent/40 text-text-secondary hover:text-text-primary font-medium transition-all">
-              Advanced Mode <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
+        </div>
+
+        {/* CTA pill */}
+        <div className="mt-16 flex flex-col items-center gap-3">
+          <button onClick={onEnter}
+            className="group flex items-center gap-3 px-8 py-4 rounded-full bg-surface border border-line/20 hover:border-accent/50 font-mono font-semibold tracking-wide transition-all">
+            DISCOVER ARGUS <ArrowDown className="w-4 h-4 text-accent group-hover:translate-y-1 transition-transform" />
+          </button>
+          <span className="text-[11px] font-mono tracking-[0.25em] text-text-muted">OR SCROLL DOWN</span>
         </div>
       </header>
 
-      {/* ── MARQUEE (8 layers) ── */}
-      <section className="relative z-10 py-10 border-y border-line/10 bg-surface/40">
-        <p className="text-center text-text-muted text-xs font-mono uppercase tracking-[0.25em] mb-6">Eight layers · one coordinated campaign</p>
+      {/* ── MARQUEE ── */}
+      <section className="relative z-10 py-9 border-y border-line/10 bg-surface/40">
+        <p className="text-center text-text-muted text-xs font-mono uppercase tracking-[0.25em] mb-6">Eight layers · one campaign</p>
         <div className="marquee-mask overflow-hidden">
           <div className="marquee-track gap-4">
             {[...LAYERS, ...LAYERS].map((l, i) => (
               <div key={i} className="flex items-center gap-3 px-6 py-3 rounded-xl border border-line/15 bg-surface shrink-0">
-                <div className="w-9 h-9 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
-                  <l.Icon className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold whitespace-nowrap">L{l.id} · {l.label}</p>
-                  <p className="text-[11px] font-mono text-text-muted whitespace-nowrap">{l.std}</p>
-                </div>
+                <div className="w-9 h-9 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center"><l.Icon className="w-5 h-5 text-accent" /></div>
+                <div><p className="text-sm font-semibold whitespace-nowrap">L{l.id} · {l.label}</p>
+                  <p className="text-[11px] font-mono text-text-muted whitespace-nowrap">{l.std}</p></div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CAPABILITIES (Salo "services" grid) ── */}
-      <Section id="capabilities">
-        <Reveal>
-          <Eyebrow>What ARGUS does</Eyebrow>
-          <h2 className="mt-5 text-4xl md:text-6xl font-bold max-w-3xl text-balance display-tight">
-            Reasoning that feels in-house, not stitched from four tools.
+      {/* ── QUOTE BAND (dark, imflorea section-2 style) ── */}
+      <section className="relative z-10 px-6 md:px-10 py-28 bg-surface/60 border-b border-line/10">
+        <Reveal className="max-w-[1500px] mx-auto flex items-start gap-8">
+          <Quote className="w-10 h-10 text-accent shrink-0 hidden md:block" />
+          <h2 className="display-tight text-balance text-4xl md:text-7xl font-black leading-[1.02]">
+            SIMPLICITY MEETS <span className="gradient-spectrum">SOPHISTICATION.</span>{" "}
+            <span className="text-text-muted text-3xl md:text-5xl">One graph that reasons where four siloed tools go blind.</span>
           </h2>
         </Reveal>
-        <div className="mt-14 grid md:grid-cols-2 gap-5">
-          {SERVICES.map((s, i) => (
-            <Reveal key={s.title} delay={i * 0.08}>
-              <article className="group h-full p-8 rounded-3xl border border-line/15 bg-surface/60 hover:bg-surface transition-colors">
-                <div className="flex items-start justify-between mb-10">
-                  <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center">
-                    <s.Icon className="w-6 h-6 text-accent" />
-                  </div>
-                  <span className="text-xs font-mono uppercase tracking-widest text-text-muted">{s.tag}</span>
-                </div>
-                <h3 className="text-2xl md:text-3xl font-semibold mb-3 group-hover:text-accent transition-colors">{s.title}</h3>
-                <p className="text-text-secondary leading-relaxed md:text-lg max-w-md">{s.body}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
+      </section>
+
+      {/* ── AGENT TERMINAL (imflorea talk-to-my-agent) ── */}
+      <Section id="agent">
+        <Reveal>
+          <div className="rounded-2xl border border-accent/20 bg-surface/70 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-line/10">
+              <span className="font-mono text-xs tracking-widest text-text-muted">ARGUS — REASONING ENGINE</span>
+              <span className="flex items-center gap-1.5 font-mono text-xs text-accent"><span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> LOCAL · READY</span>
+            </div>
+            <div className="p-6 md:p-10 font-mono text-sm md:text-base leading-relaxed">
+              <p className="text-text-muted">argus · v0.1 · build <span className="text-accent">dev</span> · 8-layer</p>
+              <p className="mt-5 text-2xl md:text-3xl font-bold"><span className="text-accent">reasoning</span>.<span className="inline-block w-3 h-6 bg-accent align-middle cursor-blink ml-1" /></p>
+              <p className="mt-5 text-text-secondary max-w-3xl">
+                trained to chain findings across web, LLM, RAG, agentic, network, supply-chain, multi-agent and identity —
+                the emergent attack paths that single-domain scanners structurally miss.
+              </p>
+              <p className="mt-4 text-text-muted text-xs">⚠ ARGUS is for authorized testing only — reason about systems you own or are permitted to assess.</p>
+              <p className="mt-6 text-[#22c55e]">$ try one ›</p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {AGENT_CHIPS.map((c) => (
+                  <button key={c} onClick={onEnter}
+                    className="px-4 py-2.5 rounded-lg border border-line/20 bg-bg/50 text-node-probing hover:border-accent/50 hover:text-accent transition-all">
+                    [ {c} ]
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Reveal>
       </Section>
 
-      {/* ── SHOWCASE (the gap statement) ── */}
-      <Section>
+      {/* ── LAYERS GRID ── */}
+      <Section id="layers">
         <Reveal>
-          <h2 className="display-tight text-balance text-3xl md:text-6xl font-bold max-w-5xl leading-[1.05]">
-            Burp sees the web. Garak sees the model. Nessus sees the network.{" "}
-            <span className="gradient-spectrum">ARGUS sees the chain between them.</span>
-          </h2>
+          <Eyebrow>Coverage</Eyebrow>
+          <h2 className="mt-5 display-tight text-balance text-4xl md:text-6xl font-bold max-w-3xl">Eight layers. One coordinated campaign.</h2>
         </Reveal>
-        <div className="mt-14 grid md:grid-cols-3 gap-5">
-          {LAYERS.slice(0, 3).map((l, i) => (
-            <Reveal key={l.id} delay={i * 0.08}>
-              <div className="rounded-3xl border border-line/15 bg-surface/60 p-7 h-full">
-                <div className="w-11 h-11 rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center mb-6">
-                  <l.Icon className="w-5 h-5 text-accent" />
+        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {LAYERS.map((l, i) => (
+            <Reveal key={l.id} delay={i * 0.05}>
+              <div className="group h-full p-6 rounded-2xl border border-line/15 bg-surface/60 hover:bg-surface transition-colors">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center"><l.Icon className="w-5 h-5 text-accent" /></div>
+                  <span className="font-mono text-xs text-accent">L{l.id}</span>
                 </div>
-                <p className="font-mono text-xs text-accent mb-1">L{l.id}</p>
-                <p className="text-xl font-semibold mb-2">{l.label}</p>
-                <p className="text-text-muted text-sm font-mono">{l.std}</p>
+                <p className="font-semibold mb-1 group-hover:text-accent transition-colors">{l.label}</p>
+                <p className="text-xs font-mono text-text-muted">{l.std}</p>
               </div>
             </Reveal>
           ))}
         </div>
       </Section>
-
-      {/* ── STATS ── */}
-      <section className="relative z-10 px-6 md:px-10 py-16 border-y border-line/10 bg-surface/30">
-        <div className="max-w-[1500px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          {STATS.map((s, i) => (
-            <Reveal key={s.l} delay={i * 0.06} className="text-center">
-              <p className="text-5xl md:text-7xl font-black gradient-spectrum display-tight">{s.v}</p>
-              <p className="text-text-muted text-sm mt-2">{s.l}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
 
       {/* ── PROCESS ── */}
       <Section id="process">
@@ -252,30 +254,26 @@ export function Landing({ onEnter }: Props) {
         </div>
       </Section>
 
-      {/* ── MODES (interactive, mode-reactive) ── */}
+      {/* ── MODES ── */}
       <Section id="modes">
         <Reveal><Eyebrow>Choose your depth</Eyebrow></Reveal>
         <div className="mt-10 grid md:grid-cols-2 gap-5">
           <ModeCard onHover={() => setMode("basic")} onLeave={() => setMode("neutral")} onClick={onEnter}
             accent="79 70 229" Icon={GraduationCap} name="Basic" tag="3 layers · quick assessment"
-            points={["Web surface · LLM probe · RAG poisoning", "Top chains + one-page report", "No configuration required"]}
-            ideal="Students, quick assessments" />
+            points={["Web surface · LLM probe · RAG poisoning", "Top chains + one-page report", "No configuration required"]} ideal="Students, quick assessments" />
           <ModeCard onHover={() => setMode("advanced")} onLeave={() => setMode("neutral")} onClick={onEnter}
             accent="168 85 247" Icon={Crosshair} name="Advanced" tag="8 layers · full red team"
-            points={["All 8 layers, configurable", "Sandboxed recon terminal", "STIX 2.1 + PDF export"]}
-            ideal="Red teamers, researchers" />
+            points={["All 8 layers, configurable", "Sandboxed recon terminal", "STIX 2.1 + PDF export"]} ideal="Red teamers, researchers" />
         </div>
       </Section>
 
       {/* ── CTA ── */}
       <section className="relative z-10 px-6 md:px-10 py-28 text-center">
         <Reveal>
-          <h2 className="display-tight text-balance text-5xl md:text-8xl font-black mb-8">
-            Reason about<br /><span className="gradient-spectrum">your attack surface.</span>
-          </h2>
+          <h2 className="display-tight text-balance text-5xl md:text-8xl font-black mb-8">Reason about<br /><span className="gradient-spectrum">your attack surface.</span></h2>
           <p className="text-text-secondary mb-10">Only test targets you own or are authorized to assess.</p>
           <button onClick={onEnter}
-            className="group inline-flex items-center gap-2 px-10 py-5 rounded-2xl bg-accent text-[rgb(var(--accent-contrast))] text-lg font-semibold hover:opacity-90 transition-all">
+            className="group inline-flex items-center gap-2 px-10 py-5 rounded-full bg-accent text-[rgb(var(--accent-contrast))] text-lg font-semibold hover:opacity-90 transition-all">
             Launch ARGUS <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         </Reveal>
@@ -285,9 +283,7 @@ export function Landing({ onEnter }: Props) {
       <footer className="relative z-10 border-t border-line/10 px-6 md:px-10 py-10">
         <div className="max-w-[1500px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg border border-accent/40 flex items-center justify-center bg-accent/10">
-              <Eye className="w-4 h-4 text-accent" />
-            </div>
+            <div className="w-7 h-7 rounded-lg border border-accent/40 flex items-center justify-center bg-accent/10"><Eye className="w-4 h-4 text-accent" /></div>
             <span className="font-mono font-bold tracking-[0.22em] text-sm">ARGUS</span>
           </div>
           <p className="text-text-muted text-xs font-mono text-center">Adversarial Reasoning &amp; Graph-based Unified Security · For authorized testing only</p>
@@ -297,15 +293,12 @@ export function Landing({ onEnter }: Props) {
   );
 }
 
-// ── Layout helpers ───────────────────────────────────────────────────────────
 function Section({ children, id }: { children: React.ReactNode; id?: string }) {
   return <section id={id} className="relative z-10 px-6 md:px-10 py-20 md:py-28 max-w-[1500px] mx-auto">{children}</section>;
 }
-
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return <p className="text-accent text-xs font-mono uppercase tracking-[0.25em]">{children}</p>;
 }
-
 function ModeCard({ onHover, onLeave, onClick, accent, Icon, name, tag, points, ideal }: {
   onHover: () => void; onLeave: () => void; onClick: () => void; accent: string;
   Icon: typeof GraduationCap; name: string; tag: string; points: string[]; ideal: string;
@@ -314,23 +307,17 @@ function ModeCard({ onHover, onLeave, onClick, accent, Icon, name, tag, points, 
     <motion.button initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
       onMouseEnter={onHover} onMouseLeave={onLeave} onClick={onClick}
       className="group text-left p-8 rounded-3xl border transition-all duration-500"
-      style={{ borderColor: `rgb(${accent} / 0.3)`, background: `rgb(${accent} / 0.05)` }}>
+      style={{ borderColor: `rgb(${accent} / 0.3)`, background: `rgb(${accent} / 0.06)` }}>
       <div className="flex items-center justify-between mb-8">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-          style={{ background: `rgb(${accent} / 0.14)`, border: `1px solid rgb(${accent} / 0.3)` }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `rgb(${accent} / 0.14)`, border: `1px solid rgb(${accent} / 0.3)` }}>
           <Icon className="w-6 h-6" style={{ color: `rgb(${accent})` }} />
         </div>
-        <ArrowUpRight className="w-6 h-6 text-text-muted group-hover:translate-x-1 group-hover:-translate-y-1 transition-all"
-          style={{ color: `rgb(${accent})` }} />
+        <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" style={{ color: `rgb(${accent})` }} />
       </div>
       <h3 className="text-3xl font-bold mb-1">{name}</h3>
       <p className="font-mono text-sm mb-6" style={{ color: `rgb(${accent})` }}>{tag}</p>
       <ul className="space-y-2.5 mb-6">
-        {points.map((p) => (
-          <li key={p} className="flex items-center gap-2.5 text-text-secondary">
-            <Check className="w-4 h-4 shrink-0" style={{ color: `rgb(${accent})` }} /> {p}
-          </li>
-        ))}
+        {points.map((p) => (<li key={p} className="flex items-center gap-2.5 text-text-secondary"><Check className="w-4 h-4 shrink-0" style={{ color: `rgb(${accent})` }} /> {p}</li>))}
       </ul>
       <p className="text-xs font-mono text-text-muted">Ideal for: {ideal}</p>
     </motion.button>
