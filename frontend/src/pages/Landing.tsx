@@ -99,7 +99,7 @@ function ProblemBand() {
   const cloudScale = useTransform(p, [0, 1], [1.1, 0.85]);
 
   return (
-    <section ref={ref} className="relative border-t border-line/10" style={{ height: "260vh" }}>
+    <section ref={ref} className="relative border-t border-line/10" style={{ height: "180vh" }}>
       <div className="sticky top-0 h-screen flex flex-col justify-center px-6 md:px-10 max-w-[1600px] mx-auto overflow-hidden">
         {/* mini theme tag */}
         <motion.div initial={{ opacity: 0, y: -8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
@@ -135,12 +135,14 @@ function ProblemBand() {
 function ScrubLine({ p, index, total, text, accent }: {
   p: MotionValue<number>; index: number; total: number; text: string; accent?: boolean;
 }) {
-  // Each line gets a slice of the [0.15, 0.95] progress window.
-  const start = 0.15 + (index / (total + 1)) * 0.7;
-  const end = start + 0.16;
-  const opacity = useTransform(p, [start, end], [0.12, 1]);
-  const y = useTransform(p, [start, end], [26, 0]);
-  const blur = useTransform(p, [start, end], [6, 0]);
+  // Lines reveal across [0.05, 0.7] so everything is fully shown well before
+  // the pin releases — no blank dead-scroll at the end.
+  const span = 0.65 / (total + 1);
+  const start = 0.05 + index * span;
+  const end = start + span * 1.6;
+  const opacity = useTransform(p, [start, end], [0.25, 1]);
+  const y = useTransform(p, [start, end], [20, 0]);
+  const blur = useTransform(p, [start, end], [4, 0]);
   const filter = useTransform(blur, (b) => `blur(${b}px)`);
   return (
     <motion.p style={{ opacity, y, filter }}
