@@ -51,22 +51,29 @@ const APART = [
 ];
 
 // Headline whose words clip-reveal upward, one after another, on scroll into view.
-function WordReveal({ text, className }: { text: string; className?: string }) {
-  const words = text.split(" ");
+// tokens: a string word, "\n" for a line break, or { w, accent } for an italic accent word.
+type Token = string | { w: string; accent: true };
+function WordReveal({ tokens, className }: { tokens: Token[]; className?: string }) {
+  let idx = 0;
   return (
-    <h2 className={className} aria-label={text}>
-      {words.map((w, i) =>
-        w === "\n" ? <br key={i} /> : (
+    <h2 className={className}>
+      {tokens.map((t, i) => {
+        if (t === "\n") return <br key={i} />;
+        const isAccent = typeof t === "object";
+        const word = isAccent ? t.w : t;
+        const delay = idx++ * 0.06;
+        return (
           <span key={i} className="inline-block overflow-hidden align-bottom mr-[0.25em]">
-            <motion.span className="inline-block"
+            <motion.span className={`inline-block ${isAccent ? "serif-italic" : ""}`}
               initial={{ y: "110%" }}
               whileInView={{ y: 0 }}
               viewport={{ once: true, margin: "-90px" }}
-              transition={{ duration: 0.75, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
-              dangerouslySetInnerHTML={{ __html: w }} />
+              transition={{ duration: 0.75, delay, ease: [0.16, 1, 0.3, 1] }}>
+              {word}
+            </motion.span>
           </span>
-        ),
-      )}
+        );
+      })}
     </h2>
   );
 }
@@ -200,7 +207,7 @@ export function Landing({ onEnter }: Props) {
       <section className="relative px-6 md:px-10 py-28 border-t border-line/10 max-w-[1600px] mx-auto">
         <WordReveal
           className="font-serif-display text-4xl md:text-7xl leading-[1.15] max-w-4xl"
-          text={'Your stack is layered. \n Your scanners <span class="serif-italic">aren't.</span>'} />
+          tokens={["Your", "stack", "is", "layered.", "\n", "Your", "scanners", { w: "aren't.", accent: true }]} />
         <div className="mt-16 grid md:grid-cols-2 gap-12 items-center">
           <Reveal><Particles /></Reveal>
           <Reveal delay={0.1} className="space-y-6 text-text-secondary text-lg leading-relaxed max-w-lg">
