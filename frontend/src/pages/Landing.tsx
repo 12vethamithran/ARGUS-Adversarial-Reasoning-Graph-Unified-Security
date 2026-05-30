@@ -208,6 +208,11 @@ export function Landing({ onEnter }: Props) {
         <WordReveal
           className="font-serif-display text-4xl md:text-7xl leading-[1.15] max-w-4xl"
           tokens={["Your", "stack", "is", "layered.", "\n", "Your", "scanners", { w: "aren't.", accent: true }]} />
+        <Reveal delay={0.15}>
+          <p className="mt-6 text-text-secondary text-lg md:text-xl leading-relaxed max-w-2xl">
+            Eight attack surfaces, eight blind spots — and the attacker only needs the seam between two of them.
+          </p>
+        </Reveal>
         <div className="mt-16 grid md:grid-cols-2 gap-12 items-center">
           <Reveal><Particles /></Reveal>
           <Reveal delay={0.1} className="space-y-6 text-text-secondary text-lg leading-relaxed max-w-lg">
