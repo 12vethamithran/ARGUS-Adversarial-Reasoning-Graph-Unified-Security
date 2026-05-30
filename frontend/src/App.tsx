@@ -25,7 +25,7 @@ export default function App() {
   // onboarding/dashboard the theme follows the selected scan mode
   // (basic → light-blue, advanced → dark-red).
   useEffect(() => {
-    const theme = view === "landing" ? "advanced" : mode;
+    const theme = view === "landing" ? "landing" : mode;
     document.documentElement.dataset.theme = theme;
   }, [view, mode]);
 

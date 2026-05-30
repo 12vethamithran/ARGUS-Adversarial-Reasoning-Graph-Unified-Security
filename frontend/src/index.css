@@ -13,58 +13,86 @@
 
 :root,
 [data-theme="advanced"] {
-  /* ── Advanced: dark-red war room ─────────────────────────── */
+  /* ── Advanced: deep violet war room ──────────────────────── */
   color-scheme: dark;
-  --bg:            12 7 10;        /* #0c070a */
-  --surface:       22 12 15;       /* #160c0f */
-  --raised:        31 16 20;       /* #1f1014 */
-  --overlay:       42 20 26;       /* #2a141a */
-  --border:        255 90 110;     /* tinted red, used at low alpha */
-  --border-alpha:  0.12;
+  --bg:            13 10 26;        /* #0d0a1a indigo-black */
+  --surface:       21 17 38;        /* #151126 */
+  --raised:        30 24 52;        /* #1e1834 */
+  --overlay:       42 33 71;        /* #2a2147 */
+  --border:        168 130 255;     /* tinted violet, low alpha */
+  --border-alpha:  0.14;
 
-  --text:          243 232 235;    /* #f3e8eb */
-  --text-secondary:200 154 162;    /* #c89aa2 */
-  --text-muted:    138 97 104;     /* #8a6168 */
+  --text:          238 233 250;     /* #eee9fa */
+  --text-secondary:181 165 214;     /* #b5a5d6 */
+  --text-muted:    128 115 158;     /* #80739e */
 
-  --accent:        255 61 87;      /* #ff3d57 crimson */
-  --accent-strong: 225 29 72;      /* #e11d48 */
+  --accent:        168 85 247;      /* #a855f7 violet-500 */
+  --accent-strong: 217 70 239;      /* #d946ef fuchsia-500 */
   --accent-contrast: 255 255 255;
 
   /* graph node states */
-  --node-discovered:  120 80 88;
-  --node-probing:     255 179 0;
-  --node-exploitable: 255 61 87;
-  --node-chained:     255 138 76;  /* orange to pop against red */
+  --node-discovered:  110 100 140;
+  --node-probing:     245 158 11;   /* amber */
+  --node-exploitable: 244 63 94;    /* rose — keeps "danger" legible */
+  --node-chained:     232 121 249;  /* magenta to pop against violet */
 
-  --grid-line:     255 90 110;
-  --glow:          255 61 87;
+  --grid-line:     168 130 255;
+  --glow:          168 85 247;
 }
 
 [data-theme="basic"] {
-  /* ── Basic: clean light-blue ─────────────────────────────── */
+  /* ── Basic: clean indigo-blue (analogous to violet Advanced) ─ */
   color-scheme: light;
-  --bg:            239 246 255;    /* #eff6ff */
+  --bg:            244 246 255;    /* #f4f6ff */
   --surface:       255 255 255;    /* #ffffff */
-  --raised:        241 247 254;    /* #f1f7fe */
-  --overlay:       226 238 250;    /* #e2eefa */
-  --border:        30 64 95;       /* slate-blue, low alpha */
-  --border-alpha:  0.14;
+  --raised:        240 242 254;    /* #f0f2fe */
+  --overlay:       226 230 251;    /* #e2e6fb */
+  --border:        49 46 129;      /* indigo, low alpha */
+  --border-alpha:  0.15;
 
-  --text:          15 34 51;       /* #0f2233 */
-  --text-secondary:59 82 104;      /* #3b5268 */
-  --text-muted:    112 137 160;    /* #7089a0 */
+  --text:          21 24 56;       /* #151838 */
+  --text-secondary:62 67 110;      /* #3e436e */
+  --text-muted:    118 122 160;    /* #767aa0 */
 
-  --accent:        14 165 233;     /* #0ea5e9 sky-500 */
-  --accent-strong: 2 132 199;      /* #0284c7 */
+  --accent:        79 70 229;      /* #4f46e5 indigo-600 */
+  --accent-strong: 37 99 235;      /* #2563eb blue-600 */
   --accent-contrast: 255 255 255;
 
   --node-discovered:  148 163 184;
   --node-probing:     245 158 11;
   --node-exploitable: 239 68 68;
-  --node-chained:     14 165 233;
+  --node-chained:     79 70 229;
 
-  --grid-line:     14 165 233;
-  --glow:          14 165 233;
+  --grid-line:     79 70 229;
+  --glow:          79 70 229;
+}
+
+[data-theme="landing"] {
+  /* ── Landing: bright analogous blue → violet → magenta ───── */
+  color-scheme: light;
+  --bg:            246 245 253;     /* #f6f5fd lavender-white */
+  --surface:       255 255 255;     /* #ffffff */
+  --raised:        242 240 252;     /* #f2f0fc */
+  --overlay:       233 229 251;     /* #e9e5fb */
+  --border:        124 58 237;      /* violet, low alpha */
+  --border-alpha:  0.16;
+
+  --text:          26 22 51;        /* #1a1633 deep indigo */
+  --text-secondary:76 68 112;       /* #4c4470 */
+  --text-muted:    135 128 168;     /* #8780a8 */
+
+  /* Neutral landing accent = violet; Landing.tsx swaps to blue/magenta on hover */
+  --accent:        124 58 237;      /* #7c3aed violet-600 */
+  --accent-strong: 217 70 239;      /* #d946ef fuchsia-500 */
+  --accent-contrast: 255 255 255;
+
+  --node-discovered:  148 163 184;
+  --node-probing:     245 158 11;
+  --node-exploitable: 244 63 94;
+  --node-chained:     168 85 247;
+
+  --grid-line:     124 58 237;
+  --glow:          124 58 237;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -181,6 +209,21 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 /* ── Editorial helpers ─────────────────────────── */
 .text-balance { text-wrap: balance; }
 .display-tight { letter-spacing: -0.04em; line-height: 0.92; }
+
+/* Analogous blue → violet → magenta gradient text */
+.gradient-spectrum {
+  background: linear-gradient(100deg, #4f46e5, #7c3aed 45%, #d946ef);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Animated aurora background for the landing hero */
+@keyframes aurora-drift {
+  0%   { transform: translate(0,0) scale(1); }
+  50%  { transform: translate(4%, -3%) scale(1.08); }
+  100% { transform: translate(0,0) scale(1); }
+}
+.aurora { animation: aurora-drift 14s ease-in-out infinite; will-change: transform; }
 
 /* Mode-reactive accent: Landing overrides --accent/--glow inline; this just
    makes the transition smooth as the user hovers Basic / Advanced. */

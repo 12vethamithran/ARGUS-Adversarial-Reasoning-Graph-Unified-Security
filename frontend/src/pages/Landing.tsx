@@ -1,16 +1,52 @@
-import { useState, type CSSProperties } from "react";
-import { motion } from "framer-motion";
+import { useRef, useState, type CSSProperties } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
   Eye, Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowUpRight, Check, X, ChevronDown, GraduationCap, Crosshair,
 } from "lucide-react";
 
 // Accent palettes (RGB channels) — drive the mode-reactive theme.
+// Analogous spectrum: indigo/blue (Basic) → violet/magenta (Advanced).
 const ACCENTS = {
-  neutral:  { a: "255 61 87",  s: "225 29 72", g: "255 61 87" },
-  basic:    { a: "14 165 233", s: "2 132 199", g: "14 165 233" },
-  advanced: { a: "255 61 87",  s: "225 29 72", g: "255 61 87" },
+  neutral:  { a: "124 58 237",  s: "217 70 239", g: "124 58 237" },  // violet
+  basic:    { a: "79 70 229",   s: "37 99 235",  g: "79 70 229"  },  // indigo→blue
+  advanced: { a: "168 85 247",  s: "217 70 239", g: "168 85 247" },  // violet→magenta
 };
+
+// Staggered word-by-word headline reveal (cinematic).
+function Words({ text, className }: { text: string; className?: string }) {
+  return (
+    <span className={className}>
+      {text.split(" ").map((w, i) => (
+        <span key={i} className="inline-block overflow-hidden align-bottom">
+          <motion.span
+            className="inline-block"
+            initial={{ y: "110%" }}
+            animate={{ y: 0 }}
+            transition={{ delay: 0.15 + i * 0.08, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {w}&nbsp;
+          </motion.span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Scroll-reveal wrapper.
+function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 const LAYERS = [
   { id: 1, Icon: Globe,    label: "Web Surface",       std: "OWASP Web Top 10" },
@@ -55,18 +91,39 @@ export function Landing({ onEnter }: Props) {
     "--accent": acc.a, "--accent-strong": acc.s, "--glow": acc.g,
   } as CSSProperties;
 
+  // Cinematic parallax: glows drift and fade as you scroll the hero.
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const glowY = useTransform(scrollYProgress, [0, 1], [0, 220]);
+  const glowY2 = useTransform(scrollYProgress, [0, 1], [0, -160]);
+  const glowFade = useTransform(scrollYProgress, [0, 1], [1, 0.15]);
+
   const Yes = () => <Check className="w-4 h-4 text-accent mx-auto" />;
   const No = () => <X className="w-4 h-4 text-text-muted/40 mx-auto" />;
 
   return (
-    <div className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
-      {/* Ambient dual glows (blue left / red right) */}
+    <div ref={ref} className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
+      {/* Ambient aurora: blue → violet → magenta */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[680px] h-[680px] rounded-full transition-opacity duration-700"
-          style={{ background: "radial-gradient(circle, rgba(14,165,233,0.10) 0%, transparent 70%)", opacity: mode === "advanced" ? 0.3 : 1 }} />
-        <div className="absolute top-20 -right-40 w-[680px] h-[680px] rounded-full transition-opacity duration-700"
-          style={{ background: "radial-gradient(circle, rgba(255,61,87,0.12) 0%, transparent 70%)", opacity: mode === "basic" ? 0.3 : 1 }} />
-        <div className="absolute inset-0 grid-bg opacity-50" />
+        <motion.div style={{ y: glowY, opacity: glowFade }}
+          className="aurora absolute -top-40 -left-40 w-[720px] h-[720px] rounded-full"
+          /* indigo-blue, dimmed when Advanced is hovered */
+        >
+          <div className="w-full h-full rounded-full transition-opacity duration-700"
+            style={{ background: "radial-gradient(circle, rgba(79,70,229,0.18) 0%, transparent 70%)", opacity: mode === "advanced" ? 0.3 : 1 }} />
+        </motion.div>
+        <motion.div style={{ y: glowY2, opacity: glowFade }}
+          className="aurora absolute top-10 -right-40 w-[760px] h-[760px] rounded-full">
+          <div className="w-full h-full rounded-full transition-opacity duration-700"
+            style={{ background: "radial-gradient(circle, rgba(217,70,239,0.18) 0%, transparent 70%)", opacity: mode === "basic" ? 0.3 : 1 }} />
+        </motion.div>
+        <motion.div style={{ opacity: glowFade }}
+          className="aurora absolute top-1/3 left-1/3 w-[560px] h-[560px] rounded-full"
+          /* violet centre tie */ >
+          <div className="w-full h-full rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)" }} />
+        </motion.div>
+        <div className="absolute inset-0 grid-bg opacity-40" />
       </div>
 
       {/* ── NAV ─────────────────────────────────────────── */}
@@ -96,10 +153,11 @@ export function Landing({ onEnter }: Props) {
           AI Red-Team Reasoning · 8 Cross-Domain Layers
         </motion.div>
 
-        <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
-          className="display-tight text-balance font-black text-[15vw] md:text-[10.5rem] leading-[0.86]">
-          SEES EVERY<br /><span className="gradient-text">ATTACK CHAIN</span>
-        </motion.h1>
+        <h1 className="display-tight text-balance font-black text-[15vw] md:text-[10.5rem] leading-[0.86]">
+          <Words text="SEES EVERY" />
+          <br />
+          <span className="gradient-spectrum"><Words text="ATTACK CHAIN" /></span>
+        </h1>
 
         <div className="mt-12 grid md:grid-cols-[1.3fr_1fr] gap-10 items-end">
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
@@ -262,7 +320,11 @@ export function Landing({ onEnter }: Props) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function Section({ children, id }: { children: React.ReactNode; id?: string }) {
-  return <section id={id} className="relative z-10 px-6 md:px-12 py-20 md:py-28 max-w-[1400px] mx-auto">{children}</section>;
+  return (
+    <section id={id} className="relative z-10 px-6 md:px-12 py-20 md:py-28 max-w-[1400px] mx-auto">
+      <Reveal>{children}</Reveal>
+    </section>
+  );
 }
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
