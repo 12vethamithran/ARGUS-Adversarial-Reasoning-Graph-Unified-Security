@@ -131,34 +131,37 @@ export function Landing({ onEnter }: Props) {
       </nav>
 
       {/* ── HERO (Furo dithered word + serif overlay) ── */}
-      <header className="relative px-6 md:px-10 pt-8 pb-24 max-w-[1600px] mx-auto min-h-[88vh] flex flex-col justify-center">
-        <motion.div style={{ y: heroY, opacity: heroFade }} aria-hidden
-          className="halftone-text absolute inset-x-4 md:inset-x-10 top-6 text-[26vw] leading-[0.8] pointer-events-none select-none">
+      <header className="relative px-6 md:px-10 pt-10 pb-20 max-w-[1600px] mx-auto min-h-[92vh] flex flex-col">
+        <motion.div style={{ y: heroY, opacity: heroFade, scale: heroScale }} aria-hidden
+          className="halftone-text absolute inset-x-4 md:inset-x-10 top-2 text-[24vw] leading-[0.8] pointer-events-none select-none origin-top">
           ARGUS
         </motion.div>
 
-        <div className="relative z-10 mt-[20vw] md:mt-[14vw]">
+        {/* headline anchored to lower third, well clear of the dithered word */}
+        <div className="relative z-10 mt-auto">
           <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
             className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-4xl">
             Security that <span className="serif-italic">sees</span><br />every attack chain.
           </motion.h1>
-        </div>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-          className="relative z-10 self-end mt-12 max-w-sm text-right">
-          <p className="text-text-secondary leading-relaxed">
-            Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that poisons a RAG
-            corpus that hijacks an agent.
-          </p>
-        </motion.div>
-
-        <div className="relative z-10 mt-14 flex items-center gap-5">
-          <button onClick={onEnter}
-            className="group flex items-center gap-3 px-7 py-4 rounded-full bg-accent text-[rgb(var(--accent-contrast))] font-medium tracking-wide hover:opacity-90 transition-all">
-            DISCOVER ARGUS <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
-          </button>
-          <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted">OR SCROLL DOWN</span>
+          {/* CTA (left) + description (right) on one row, generous gap below headline */}
+          <div className="mt-16 grid md:grid-cols-[auto_1fr] items-end gap-x-10 gap-y-8">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
+              className="flex items-center gap-5">
+              <button onClick={onEnter}
+                className="group flex items-center gap-3 px-7 py-4 rounded-full bg-accent text-[rgb(var(--accent-contrast))] font-medium tracking-wide hover:opacity-90 transition-all">
+                DISCOVER ARGUS <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
+              </button>
+              <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted whitespace-nowrap">OR SCROLL DOWN</span>
+            </motion.div>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
+              className="md:justify-self-end md:text-right text-text-secondary leading-relaxed max-w-sm">
+              Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that
+              poisons a RAG corpus that hijacks an agent.
+            </motion.p>
+          </div>
         </div>
+        {/* end hero content */}
       </header>
 
       {/* ── PROBLEM BAND ── */}
