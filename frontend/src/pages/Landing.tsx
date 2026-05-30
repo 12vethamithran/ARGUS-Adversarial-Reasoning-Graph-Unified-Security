@@ -162,8 +162,15 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── HERO (Furo dithered word + serif overlay) ── */}
       <header className="relative px-6 md:px-10 pt-10 pb-20 max-w-[1600px] mx-auto min-h-[92vh] flex flex-col">
+        {/* eyebrow / mini theme tag */}
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="relative z-10 inline-flex self-start items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+          AI RED-TEAM REASONING · 8 CROSS-DOMAIN LAYERS
+        </motion.div>
+
         <motion.div style={{ y: heroY, opacity: heroFade, scale: heroScale }} aria-hidden
-          className="absolute inset-x-4 md:inset-x-10 top-2 flex justify-between pointer-events-none select-none origin-top">
+          className="absolute inset-x-4 md:inset-x-10 top-16 md:top-20 flex justify-between pointer-events-none select-none origin-top">
           {"ARGUS".split("").map((ch, i) => (
             <motion.span key={i}
               className="halftone-text halftone-breathe text-[24vw] leading-[0.8] inline-block"
