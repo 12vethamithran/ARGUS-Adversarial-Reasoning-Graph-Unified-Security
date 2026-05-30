@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion, useScroll, useTransform, useSpring, type MotionValue } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
@@ -78,106 +78,75 @@ function WordReveal({ tokens, className }: { tokens: Token[]; className?: string
   );
 }
 
-// Furo "problem" transition: a tall section pinned to the viewport; as the user
-// scrolls through it, the particle cluster condenses and the copy reveals
-// line-by-line scrubbed to scroll progress (not a one-shot fade).
 const PROBLEM_LINES = [
   "You harden the web tier. You probe the model. You scan the network.",
   "Each tool sees its own slice — and nothing sees the seams between them.",
   "But real breaches don't respect tool boundaries.",
   "A reflected input becomes a prompt injection, becomes a poisoned retrieval, becomes a hijacked agent, becomes a network pivot.",
+  "That cross-layer chain is exactly what ARGUS is built to reason about.",
 ];
 
+// Normal-flow section (no scroll-pin → no dead scroll). Copy staggers in on
+// enter; the particle cloud quietly drifts and condenses on a loop.
 function ProblemBand() {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const p = useSpring(scrollYProgress, { stiffness: 90, damping: 26, mass: 0.4 });
-
-  // Particle cluster condenses (scatter -> tight) and rotates as you scroll.
-  const scatter = useTransform(p, [0, 1], [1, 0.18]);
-  const rot = useTransform(p, [0, 1], [0, 90]);
-  const cloudScale = useTransform(p, [0, 1], [1.1, 0.85]);
-
   return (
-    <section ref={ref} className="relative border-t border-line/10" style={{ height: "180vh" }}>
-      <div className="sticky top-0 h-screen flex flex-col justify-center px-6 md:px-10 max-w-[1600px] mx-auto overflow-hidden">
-        {/* mini theme tag */}
-        <motion.div initial={{ opacity: 0, y: -8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-          className="inline-flex self-start items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
+    <section className="relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
+      <Reveal>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           THE PROBLEM · CROSS-LAYER BLIND SPOTS
-        </motion.div>
+        </div>
+      </Reveal>
 
-        <WordReveal
-          className="font-serif-display text-4xl md:text-7xl leading-[1.2] max-w-4xl"
-          tokens={["Your", "stack", "is", "layered.", "\n", "Your", "scanners", { w: "aren't.", accent: true }]} />
+      <WordReveal
+        className="font-serif-display text-4xl md:text-7xl leading-[1.2] max-w-4xl"
+        tokens={["Your", "stack", "is", "layered.", "\n", "Your", "scanners", { w: "aren't.", accent: true }]} />
 
-        <div className="mt-12 grid md:grid-cols-2 gap-12 items-center">
-          {/* condensing particle cloud */}
-          <motion.div style={{ scale: cloudScale, rotate: rot }} className="relative h-64 md:h-80">
-            <ScrubParticles scatter={scatter} />
-          </motion.div>
-
-          {/* copy revealed line-by-line, scrubbed to scroll */}
-          <div className="space-y-5 max-w-lg">
-            {PROBLEM_LINES.map((line, i) => (
-              <ScrubLine key={i} p={p} index={i} total={PROBLEM_LINES.length} text={line} />
-            ))}
-            <ScrubLine p={p} index={PROBLEM_LINES.length} total={PROBLEM_LINES.length}
-              text="That cross-layer chain is exactly what ARGUS is built to reason about." accent />
-          </div>
+      <div className="mt-16 grid md:grid-cols-2 gap-12 items-center">
+        <Reveal className="relative h-60 md:h-72">
+          <DriftParticles />
+        </Reveal>
+        <div className="space-y-5 max-w-lg">
+          {PROBLEM_LINES.map((line, i) => (
+            <motion.p key={i}
+              initial={{ opacity: 0, y: 22, filter: "blur(5px)" }}
+              whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.7, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
+              className={`text-lg md:text-xl leading-relaxed ${
+                i === PROBLEM_LINES.length - 1 ? "text-text-primary font-medium" : "text-text-secondary"
+              }`}>
+              {line}
+            </motion.p>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function ScrubLine({ p, index, total, text, accent }: {
-  p: MotionValue<number>; index: number; total: number; text: string; accent?: boolean;
-}) {
-  // Lines reveal across [0.05, 0.7] so everything is fully shown well before
-  // the pin releases — no blank dead-scroll at the end.
-  const span = 0.65 / (total + 1);
-  const start = 0.05 + index * span;
-  const end = start + span * 1.6;
-  const opacity = useTransform(p, [start, end], [0.25, 1]);
-  const y = useTransform(p, [start, end], [20, 0]);
-  const blur = useTransform(p, [start, end], [4, 0]);
-  const filter = useTransform(blur, (b) => `blur(${b}px)`);
-  return (
-    <motion.p style={{ opacity, y, filter }}
-      className={`text-lg md:text-xl leading-relaxed ${accent ? "text-text-primary font-medium" : "text-text-secondary"}`}>
-      {text}
-    </motion.p>
-  );
-}
-
-function ScrubParticles({ scatter }: { scatter: MotionValue<number> }) {
-  const dots = Array.from({ length: 80 }, (_, i) => {
-    const a = (i / 80) * Math.PI * 2 * 3;
-    const r = 20 + (i % 13) * 9;
+// Self-contained looping particle cluster — gentle breathe + rotate, no scroll dependency.
+function DriftParticles() {
+  const dots = Array.from({ length: 70 }, (_, i) => {
+    const a = (i / 70) * Math.PI * 2 * 3;
+    const r = 18 + (i % 12) * 9;
     return { x: Math.cos(a) * r, y: Math.sin(a) * r, i };
   });
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      {dots.map(({ x, y, i }) => (
-        <Dot key={i} x={x} y={y} scatter={scatter} idx={i} />
-      ))}
-    </div>
-  );
-}
-
-function Dot({ x, y, scatter, idx }: { x: number; y: number; scatter: MotionValue<number>; idx: number }) {
-  const tx = useTransform(scatter, (s) => x * s);
-  const ty = useTransform(scatter, (s) => y * s);
-  return (
-    <motion.span
-      style={{ x: tx, y: ty }}
-      className="absolute font-mono text-xs text-text-muted"
-      animate={{ opacity: [0.25, 0.75, 0.25] }}
-      transition={{ duration: 3 + (idx % 5), repeat: Infinity, delay: idx * 0.03 }}>
-      +
-    </motion.span>
+    <motion.div className="absolute inset-0 flex items-center justify-center"
+      animate={{ rotate: 360 }} transition={{ duration: 80, repeat: Infinity, ease: "linear" }}>
+      <motion.div className="relative"
+        animate={{ scale: [1, 0.82, 1] }} transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}>
+        {dots.map(({ x, y, i }) => (
+          <motion.span key={i} className="absolute font-mono text-xs text-text-muted"
+            style={{ left: x, top: y }}
+            animate={{ opacity: [0.2, 0.7, 0.2] }}
+            transition={{ duration: 3 + (i % 5), repeat: Infinity, delay: i * 0.03 }}>
+            +
+          </motion.span>
+        ))}
+      </motion.div>
+    </motion.div>
   );
 }
 
