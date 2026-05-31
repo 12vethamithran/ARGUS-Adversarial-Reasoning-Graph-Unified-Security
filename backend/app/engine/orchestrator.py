@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 from app.engine.state import ArgusState
 from app.engine.scorer import score_chain
@@ -56,31 +56,36 @@ def _should_run(layer_id: int, state: ArgusState) -> bool:
 
 async def run_orchestrator(
     state: ArgusState,
-    on_event: Any,  # callable(StreamEvent)
-) -> ArgusState:
+) -> AsyncGenerator[StreamEvent, None]:
     """
-    Main orchestration loop. Runs layers sequentially (respecting deps),
-    then feeds exploitable findings to the reasoner for chain generation.
-    Calls on_event(StreamEvent) for each significant state change.
+    Main orchestration loop and single source of truth for the analysis
+    stream. Runs layers sequentially (respecting conditional deps), then
+    feeds exploitable findings to the reasoner for chain generation.
+
+    Yields a StreamEvent for each significant state change — the SSE
+    endpoint wraps these as `data:` frames. Always yields a terminal
+    `complete` event on the normal path.
     """
     from app.engine.reasoner import stream_reasoning, _heuristic_chains
 
-    on_event(StreamEvent.reasoning_token("ARGUS orchestrator starting...\n"))
-
     for layer_id in state.active_layers:
         if state.iteration >= state.max_iterations:
-            on_event(StreamEvent.reasoning_token("Max iterations reached — stopping.\n"))
+            yield StreamEvent.reasoning_token("Max iterations reached — stopping.\n")
             break
 
         name = _LAYER_NAMES.get(layer_id, f"Layer {layer_id}")
 
         if not _should_run(layer_id, state):
-            on_event(StreamEvent.reasoning_token(
-                f"L{layer_id} ({name}) skipped — prerequisite layers have no exploitable findings.\n"
-            ))
+            deps = ", ".join(f"L{d}" for d in _LAYER_DEPS.get(layer_id, []))
+            yield StreamEvent.reasoning_token(
+                f"L{layer_id} ({name}) skipped — prerequisite {deps} found nothing exploitable.\n"
+            )
+            yield StreamEvent.layer_done(layer_id, 0)
+            await asyncio.sleep(0.03)
             continue
 
-        on_event(StreamEvent.reasoning_token(f"Running L{layer_id}: {name}...\n"))
+        yield StreamEvent.reasoning_token(f"Scanning L{layer_id}: {name}...\n")
+        await asyncio.sleep(0.03)
 
         try:
             layer = _import_layer(layer_id)
@@ -88,51 +93,58 @@ async def run_orchestrator(
                 layer.run(state.target, state), timeout=LAYER_TIMEOUT
             )
         except asyncio.TimeoutError:
-            on_event(StreamEvent.reasoning_token(f"L{layer_id} timed out after {LAYER_TIMEOUT}s.\n"))
-            findings = []
+            yield StreamEvent.reasoning_token(f"L{layer_id} timed out after {LAYER_TIMEOUT}s.\n")
+            yield StreamEvent.layer_done(layer_id, 0)
+            continue
         except Exception as exc:
-            on_event(StreamEvent.reasoning_token(f"L{layer_id} error: {type(exc).__name__}: {exc}\n"))
-            findings = []
+            yield StreamEvent.reasoning_token(f"L{layer_id} skipped ({type(exc).__name__}: {exc}).\n")
+            yield StreamEvent.layer_done(layer_id, 0)
+            continue
 
         for f in findings:
             state.findings[f.id] = f
-            on_event(StreamEvent(
+            yield StreamEvent(
                 type="node_state",
                 payload={"finding_id": f.id, "state": "discovered", "finding": f.model_dump()},
-            ))
+            )
+            await asyncio.sleep(0.08)
             if f.exploitable:
                 f.node_state = "exploitable"
-                on_event(StreamEvent(
+                yield StreamEvent(
                     type="node_state",
                     payload={"finding_id": f.id, "state": "exploitable"},
-                ))
+                )
+                await asyncio.sleep(0.1)
 
         state.completed_layers.append(layer_id)
         state.iteration += 1
-        on_event(StreamEvent.layer_done(layer_id, len(findings)))
-        on_event(StreamEvent.reasoning_token(
-            f"L{layer_id} complete: {len(findings)} findings "
-            f"({sum(1 for f in findings if f.exploitable)} exploitable).\n"
-        ))
+        yield StreamEvent.layer_done(layer_id, len(findings))
+        yield StreamEvent.reasoning_token(
+            f"L{layer_id} done: {len(findings)} findings, "
+            f"{sum(1 for f in findings if f.exploitable)} exploitable.\n"
+        )
+        await asyncio.sleep(0.04)
 
     # ── Reasoning phase ──────────────────────────────────────────────
     exploitable = [f for f in state.findings.values() if f.exploitable]
-    on_event(StreamEvent.reasoning_token(
-        f"\nReasoning over {len(exploitable)} exploitable findings...\n"
-    ))
+    yield StreamEvent.reasoning_token(
+        f"\nBuilding attack chains from {len(exploitable)} exploitable findings...\n"
+    )
+    await asyncio.sleep(0.08)
 
     if exploitable:
         tokens: list[str] = []
         try:
             chains = await asyncio.wait_for(
-                stream_reasoning(exploitable, lambda t: tokens.append(t)),
+                stream_reasoning(exploitable, lambda t: tokens.append(t), state.target),
                 timeout=30.0,
             )
         except Exception:
             chains = _heuristic_chains(exploitable, lambda t: tokens.append(t))
 
         for t in tokens:
-            on_event(StreamEvent.reasoning_token(t))
+            yield StreamEvent.reasoning_token(t)
+            await asyncio.sleep(0.025)
 
         for chain in chains:
             chain.priority = score_chain(chain)
@@ -140,13 +152,14 @@ async def run_orchestrator(
             for fid in chain.steps:
                 if fid in state.findings:
                     state.findings[fid].node_state = "chained"
-                    on_event(StreamEvent(
+                    yield StreamEvent(
                         type="node_state",
                         payload={"finding_id": fid, "state": "chained"},
-                    ))
-            on_event(StreamEvent.chain_found(chain.model_dump()))
+                    )
+                    await asyncio.sleep(0.07)
+            yield StreamEvent.chain_found(chain.model_dump())
+            await asyncio.sleep(0.1)
     else:
-        on_event(StreamEvent.reasoning_token("No exploitable findings — no chains generated.\n"))
+        yield StreamEvent.reasoning_token("No exploitable findings — no chains generated.\n")
 
-    on_event(StreamEvent.complete(state.session_id))
-    return state
+    yield StreamEvent.complete(state.session_id)

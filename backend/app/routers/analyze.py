@@ -14,12 +14,6 @@ from app.engine.state import ArgusState
 
 router = APIRouter()
 
-LAYER_NAMES = {
-    1: "Web Surface", 2: "LLM Probe", 3: "RAG Poisoning",
-    4: "MCP/Agentic", 5: "Network Recon", 6: "Supply Chain",
-    7: "Multi-Agent", 8: "Identity/OAuth",
-}
-
 class StartAnalysisBody(BaseModel):
     mode: AnalysisMode = "basic"
     target: AnalysisTarget
@@ -42,102 +36,22 @@ async def _run_analysis(session_id: str, body: StartAnalysisBody) -> AsyncGenera
     yield sse(StreamEvent.reasoning_token("ARGUS initialized — starting analysis...\n"))
     await asyncio.sleep(0.05)
 
-    # ── Everything else inside one big try/except ──────────────────────
+    # ── Delegate to the orchestrator — the single source of truth for
+    #    the analysis stream (layer execution, conditional deps, reasoning).
     try:
-        from app.engine.reasoner import stream_reasoning, _heuristic_chains
-        from app.layers.web import WebLayer
-        from app.layers.llm_probe import LLMProbeLayer
-        from app.layers.rag_poison import RAGPoisonLayer
-        from app.layers.mcp_agent import MCPAgentLayer
-        from app.layers.network import NetworkLayer
-        from app.layers.supply_chain import SupplyChainLayer
-        from app.layers.multi_agent import MultiAgentLayer
-        from app.layers.identity import IdentityLayer
-
-        layer_map = {
-            1: WebLayer(), 2: LLMProbeLayer(), 3: RAGPoisonLayer(),
-            4: MCPAgentLayer(), 5: NetworkLayer(), 6: SupplyChainLayer(),
-            7: MultiAgentLayer(), 8: IdentityLayer(),
-        }
+        from app.engine.orchestrator import run_orchestrator
 
         state = ArgusState(
             session_id=session_id, mode=body.mode,
             target=target_dict, active_layers=layers_to_run,
         )
 
-        for layer_id in layers_to_run:
-            name = LAYER_NAMES.get(layer_id, f"Layer {layer_id}")
-            yield sse(StreamEvent.reasoning_token(f"Scanning L{layer_id}: {name}...\n"))
-            await asyncio.sleep(0.03)
-
-            layer = layer_map.get(layer_id)
-            if not layer:
-                yield sse(StreamEvent.layer_done(layer_id, 0))
-                continue
-
-            try:
-                findings = await asyncio.wait_for(layer.run(target_dict, state), timeout=10.0)
-            except asyncio.TimeoutError:
-                yield sse(StreamEvent.reasoning_token(f"L{layer_id} timed out.\n"))
-                yield sse(StreamEvent.layer_done(layer_id, 0))
-                continue
-            except Exception as exc:
-                yield sse(StreamEvent.reasoning_token(f"L{layer_id} skipped ({type(exc).__name__}).\n"))
-                yield sse(StreamEvent.layer_done(layer_id, 0))
-                continue
-
-            for f in findings:
-                state.findings[f.id] = f
-                yield sse(finding_event(f, "discovered"))
-                await asyncio.sleep(0.08)
-                if f.exploitable:
-                    f.node_state = "exploitable"
-                    yield sse(StreamEvent(type="node_state", payload={"finding_id": f.id, "state": "exploitable"}))
-                    await asyncio.sleep(0.1)
-
-            yield sse(StreamEvent.layer_done(layer_id, len(findings)))
-            yield sse(StreamEvent.reasoning_token(
-                f"L{layer_id} done: {len(findings)} findings, "
-                f"{sum(1 for f in findings if f.exploitable)} exploitable.\n"
-            ))
-            await asyncio.sleep(0.04)
-
-        # Reasoning
-        exploitable = [f for f in state.findings.values() if f.exploitable]
-        yield sse(StreamEvent.reasoning_token(
-            f"\nBuilding attack chains from {len(exploitable)} exploitable findings...\n"
-        ))
-        await asyncio.sleep(0.08)
-
-        if exploitable:
-            tokens: list[str] = []
-            try:
-                chains = await asyncio.wait_for(
-                    stream_reasoning(exploitable, lambda t: tokens.append(t), target_dict), timeout=25.0
-                )
-            except Exception:
-                chains = _heuristic_chains(exploitable, lambda t: tokens.append(t))
-
-            for t in tokens:
-                yield sse(StreamEvent.reasoning_token(t))
-                await asyncio.sleep(0.025)
-
-            for chain in chains:
-                for fid in chain.steps:
-                    if fid in state.findings:
-                        state.findings[fid].node_state = "chained"
-                        yield sse(StreamEvent(type="node_state", payload={"finding_id": fid, "state": "chained"}))
-                        await asyncio.sleep(0.07)
-                yield sse(StreamEvent.chain_found(chain.model_dump()))
-                await asyncio.sleep(0.1)
-        else:
-            yield sse(StreamEvent.reasoning_token("No exploitable findings — no chains generated.\n"))
-
+        # The orchestrator yields its own terminal `complete` event.
+        async for event in run_orchestrator(state):
+            yield sse(event)
     except Exception as outer_exc:
         yield sse(StreamEvent.reasoning_token(f"Analysis error: {outer_exc}\n"))
-
-    # ── Always send complete ───────────────────────────────────────────
-    yield sse(StreamEvent.complete(session_id))
+        yield sse(StreamEvent.complete(session_id))
 
 
 async def _mock_stream(session_id: str, layers: list[int]) -> AsyncGenerator[str, None]:
