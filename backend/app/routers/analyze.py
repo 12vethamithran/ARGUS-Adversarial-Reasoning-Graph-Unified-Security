@@ -49,9 +49,31 @@ async def _run_analysis(session_id: str, body: StartAnalysisBody) -> AsyncGenera
         # The orchestrator yields its own terminal `complete` event.
         async for event in run_orchestrator(state):
             yield sse(event)
+
+        # Persist so the /api/reports/* endpoints can render this analysis.
+        await _persist(session_id, body, state)
     except Exception as outer_exc:
         yield sse(StreamEvent.reasoning_token(f"Analysis error: {outer_exc}\n"))
         yield sse(StreamEvent.complete(session_id))
+
+
+async def _persist(session_id: str, body: StartAnalysisBody, state) -> None:
+    """Best-effort persistence of findings + chains for later reporting."""
+    try:
+        from app.storage import session_store
+        target = body.target.model_dump(exclude_none=True)
+        target.pop("manifest", None)  # don't persist the raw manifest blob
+        await session_store.save_session(session_id, {
+            "id": session_id,
+            "mode": body.mode,
+            "status": "complete",
+            "target": target,
+            "findings": {fid: f.model_dump() for fid, f in state.findings.items()},
+            "chain_ids": [c.id for c in state.chains],
+        })
+        await session_store.save_chains(session_id, [c.model_dump() for c in state.chains])
+    except Exception:
+        pass  # reporting persistence is non-critical to the live stream
 
 
 async def _mock_stream(session_id: str, layers: list[int]) -> AsyncGenerator[str, None]:
