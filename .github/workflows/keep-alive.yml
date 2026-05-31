@@ -1,0 +1,20 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    # Ping every 10 minutes to prevent Render cold starts
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RENDER_BACKEND_URL }}/health")
+          echo "Health check status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::warning::Backend returned $STATUS — may be cold starting"
+          fi

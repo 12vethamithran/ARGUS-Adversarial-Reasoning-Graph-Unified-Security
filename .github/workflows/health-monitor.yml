@@ -1,0 +1,45 @@
+name: Health Monitor
+
+on:
+  schedule:
+    # Full health check every hour
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    name: Monitor backend & frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check backend /health
+        id: backend
+        run: |
+          RESPONSE=$(curl -s --max-time 15 "${{ secrets.RENDER_BACKEND_URL }}/health")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ secrets.RENDER_BACKEND_URL }}/health")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
+          echo "Backend status: $STATUS | Response: $RESPONSE"
+
+      - name: Check frontend
+        id: frontend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ secrets.VERCEL_FRONTEND_URL }}")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Frontend status: $STATUS"
+
+      - name: Check backend docs reachable
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ secrets.RENDER_BACKEND_URL }}/docs")
+          echo "API docs status: $STATUS"
+
+      - name: Fail if backend is down
+        if: steps.backend.outputs.status != '200'
+        run: |
+          echo "::error::Backend is DOWN — status ${{ steps.backend.outputs.status }}"
+          exit 1
+
+      - name: Warn if frontend is down
+        if: steps.frontend.outputs.status != '200'
+        run: |
+          echo "::error::Frontend is DOWN — status ${{ steps.frontend.outputs.status }}"
+          exit 1
