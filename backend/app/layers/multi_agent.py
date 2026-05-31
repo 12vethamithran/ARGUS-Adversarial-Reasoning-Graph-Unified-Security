@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING
 import networkx as nx
 
 from app.layers.base import BaseLayer
+from app.engine.target_profile import target_seed, jitter
 
 if TYPE_CHECKING:
     from app.engine.state import ArgusState
 
 
-def _build_agent_topology(seed: int = 42) -> nx.DiGraph:
-    random.seed(seed)
+def _build_agent_topology(seed: int) -> nx.DiGraph:
+    rng = random.Random(seed)
     G = nx.DiGraph()
     agents = [
         {"id": "orchestrator", "role": "coordinator", "trust": 1.0},
@@ -31,11 +32,11 @@ def _build_agent_topology(seed: int = 42) -> nx.DiGraph:
         ("web-agent", "llm-agent-1"),
     ]
     for src, dst in edges:
-        G.add_edge(src, dst, weight=random.uniform(0.6, 0.95))
+        G.add_edge(src, dst, weight=rng.uniform(0.6, 0.95))
     return G
 
 
-def _simulate_infection(G: nx.DiGraph, seed_node: str, hops: int = 4) -> dict:
+def _simulate_infection(G: nx.DiGraph, seed_node: str, rng: random.Random, hops: int = 4) -> dict:
     infected = {seed_node: 1.0}
     frontier = [seed_node]
     hop_log = []
@@ -47,7 +48,7 @@ def _simulate_infection(G: nx.DiGraph, seed_node: str, hops: int = 4) -> dict:
                     edge_weight = G[node][neighbor]["weight"]
                     trust = G.nodes[neighbor].get("trust", 0.8)
                     spread_prob = edge_weight * (1 - trust)
-                    if random.random() < spread_prob:
+                    if rng.random() < spread_prob:
                         infected[neighbor] = round(spread_prob, 2)
                         next_frontier.append(neighbor)
                         hop_log.append({"hop": hop + 1, "from": node, "to": neighbor, "prob": round(spread_prob, 2)})
@@ -63,8 +64,11 @@ class MultiAgentLayer(BaseLayer):
 
     async def run(self, target: dict, state: "ArgusState") -> list[Finding]:
         findings = []
-        G = _build_agent_topology()
-        result = _simulate_infection(G, seed_node="web-agent", hops=4)
+        # Seed the whole simulation from the target so each target gets a distinct
+        # but reproducible infection outcome (was a fixed seed=42 for everyone).
+        seed = target_seed(target)
+        G = _build_agent_topology(seed)
+        result = _simulate_infection(G, seed_node="web-agent", rng=random.Random(seed ^ 0x5A))
 
         infected_count = len(result["infected"])
         total = result["total_agents"]
@@ -82,8 +86,9 @@ class MultiAgentLayer(BaseLayer):
                 "propagation_log": result["log"],
                 "infection_rate": round(infection_rate, 2),
             },
-            exploitable=True,
-            confidence=0.83,
+            exploitable=infection_rate > 0.15,
+            # Confidence tracks how far the infection actually spread for THIS target.
+            confidence=round(min(0.5 + infection_rate * 0.45, 0.95), 3),
         ))
 
         # Check if orchestrator was infected
@@ -98,7 +103,7 @@ class MultiAgentLayer(BaseLayer):
                     "role": "coordinator",
                     "impact": "All downstream agents now execute attacker-controlled instructions",
                 },
-                exploitable=True, confidence=0.91,
+                exploitable=True, confidence=jitter(target, "l7-orchestrator", 0.88, 0.07),
             ))
 
         # Trust boundary violations

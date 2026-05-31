@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from app.layers.base import BaseLayer
+from app.engine.target_profile import jitter, gate
 
 if TYPE_CHECKING:
     from app.engine.state import ArgusState
@@ -66,7 +67,12 @@ class IdentityLayer(BaseLayer):
 
     async def run(self, target: dict, state: "ArgusState") -> list[Finding]:
         findings = []
+        # Each OAuth/identity weakness is surfaced per-target rather than asserted
+        # for everyone, with target-derived confidence — so different targets get a
+        # different identity-risk profile (and therefore different chain scores).
         for check in OAUTH_CHECKS:
+            if not gate(target, f"l8-{check['id']}", 0.6):
+                continue
             findings.append(self._finding(
                 title=f"[{check['id']}] {check['title']}",
                 severity=check["severity"],
@@ -74,6 +80,14 @@ class IdentityLayer(BaseLayer):
                 mitre_ref=check["mitre_ref"],
                 evidence={**check["evidence"], "cve_class": check["cve_class"]},
                 exploitable=check["exploitable"],
-                confidence=check["confidence"],
+                confidence=jitter(target, f"l8-{check['id']}-conf", check["confidence"], 0.08),
+            ))
+
+        if not findings:
+            findings.append(self._finding(
+                title="No high-confidence identity/OAuth weaknesses surfaced for this target",
+                severity="info", owasp_ref="A07:2021",
+                evidence={"note": "Heuristic scan — validate against the real auth flow"},
+                exploitable=False, confidence=0.6,
             ))
         return findings

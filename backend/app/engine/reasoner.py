@@ -8,6 +8,7 @@ narratives so the UI is meaningful even with no API key.
 from __future__ import annotations
 import json
 from app.config import settings
+from app.engine.scorer import compute_chain_metrics, score_chain
 from app.models.chain import Chain, Remediation
 from app.models.finding import Finding
 
@@ -108,7 +109,7 @@ async def stream_reasoning(findings: list[Finding], on_token, target: dict | Non
             step_ids = [findings[i].id for i in indices if isinstance(i, int) and i < len(findings)]
             if not step_ids:
                 continue
-            chains.append(Chain(
+            chain = Chain(
                 steps=step_ids,
                 narrative=c.get("narrative", ""),
                 exploitability=float(c.get("exploitability", 0.5)),
@@ -116,7 +117,11 @@ async def stream_reasoning(findings: list[Finding], on_token, target: dict | Non
                 novelty=float(c.get("novelty", 0.5)),
                 priority=float(c.get("priority", 0.5)),
                 remediations=[Remediation(**r) for r in c.get("remediations", []) if isinstance(r, dict)],
-            ))
+            )
+            # Recompute priority with ARGUS's own weighting so Gemini and the
+            # heuristic path rank chains on the same scale.
+            chain.priority = score_chain(chain)
+            chains.append(chain)
         # Highest-priority first
         chains.sort(key=lambda c: c.priority, reverse=True)
         return chains or _heuristic_chains(findings, on_token)
@@ -142,20 +147,9 @@ def _build_chain(ordered: list[Finding], on_token) -> Chain | None:
     layers_hit = {f.layer for f in ordered}
     narrative = " -> ".join(f"L{f.layer}: {f.title}" for f in ordered)
 
-    avg_conf = sum(f.confidence for f in ordered) / len(ordered)
-    max_sev = max(SEVERITY_WEIGHT.get(f.severity, 0.3) for f in ordered)
-
-    # Cross-domain bonus: a chain touching web + AI + infra is genuinely novel.
-    domains = sum([
-        bool(layers_hit & WEB_LAYERS),
-        bool(layers_hit & AI_LAYERS),
-        bool(layers_hit & INFRA_LAYERS),
-    ])
-    novelty = min(0.35 + 0.18 * (len(layers_hit) - 1) + 0.1 * (domains - 1), 0.97)
-
-    exploitability = round(avg_conf, 2)
-    impact = round(min(max_sev * (1 + 0.05 * (len(layers_hit) - 1)), 1.0), 2)
-    priority = round(min(0.5 * impact + 0.35 * exploitability + 0.15 * novelty, 1.0), 2)
+    # Single source of truth for scoring (see engine/scorer.py). Because the layers
+    # now produce target-derived confidences, these metrics vary per target.
+    m = compute_chain_metrics(ordered)
 
     remediations = [
         Remediation(layer=f.layer, action=f"Mitigate: {f.title}", ref=f.owasp_ref or f.mitre_ref or "N/A")
@@ -164,17 +158,17 @@ def _build_chain(ordered: list[Finding], on_token) -> Chain | None:
 
     on_token(f"[ARGUS] Chain ({len(layers_hit)} layers): {narrative}\n")
     on_token(
-        f"[ARGUS]   exploit={exploitability:.2f} impact={impact:.2f} "
-        f"novelty={novelty:.2f} -> priority={priority:.2f}\n"
+        f"[ARGUS]   exploit={m['exploitability']:.2f} impact={m['impact']:.2f} "
+        f"novelty={m['novelty']:.2f} -> priority={m['priority']:.2f}\n"
     )
 
     return Chain(
         steps=[f.id for f in ordered],
         narrative=narrative,
-        exploitability=exploitability,
-        impact=impact,
-        novelty=round(novelty, 2),
-        priority=priority,
+        exploitability=m["exploitability"],
+        impact=m["impact"],
+        novelty=m["novelty"],
+        priority=m["priority"],
         remediations=remediations,
     )
 

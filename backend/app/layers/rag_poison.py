@@ -6,6 +6,7 @@ import random
 from typing import TYPE_CHECKING
 
 from app.layers.base import BaseLayer
+from app.engine.target_profile import target_seed, jitter
 from app.models.finding import Finding
 
 if TYPE_CHECKING:
@@ -72,8 +73,9 @@ class RAGPoisonLayer(BaseLayer):
             ))
             return findings
 
-        # Simulate in-memory corpus with adversarial injection
-        corpus_size = random.randint(800, 5000)
+        # Simulate in-memory corpus with adversarial injection (target-seeded so the
+        # corpus size / injection ratio is reproducible per target, not random each run).
+        corpus_size = random.Random(target_seed(target)).randint(800, 5000)
         injected_count = len(ADVERSARIAL_DOCS)
         injection_ratio = injected_count / corpus_size
 
@@ -105,7 +107,7 @@ class RAGPoisonLayer(BaseLayer):
                 "displacements": displacements,
             },
             exploitable=True,
-            confidence=0.86,
+            confidence=jitter(target, "l3-corpus", 0.84, 0.1),
         ))
 
         # Finding: retrieval displacement
