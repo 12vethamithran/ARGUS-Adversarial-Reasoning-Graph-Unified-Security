@@ -1,16 +1,43 @@
+import asyncio
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
 from app.config import settings
 from app.routers import session, analyze, terminal, report
+from app.storage.session_store import run_janitor_loop
 
 log = structlog.get_logger()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure the data subdirectories exist before serving.
+    for d in ["sessions", "graphs", "logs", "reports", "cache"]:
+        os.makedirs(f"{settings.data_dir}/{d}", exist_ok=True)
+    log.info("argus.startup", data_dir=settings.data_dir)
+
+    # Start the TTL janitor so expired sessions are actually reaped.
+    janitor = asyncio.create_task(run_janitor_loop())
+    try:
+        yield
+    finally:
+        janitor.cancel()
+        try:
+            await janitor
+        except asyncio.CancelledError:
+            pass
+        log.info("argus.shutdown")
+
 
 app = FastAPI(
     title="ARGUS API",
     description="Adversarial Reasoning & Graph-based Unified Security Framework",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS — explicit allow-list plus a dev regex so any localhost / 127.0.0.1
@@ -37,11 +64,3 @@ app.include_router(report.router, prefix="/api/reports", tags=["reports"])
 @app.get("/health", tags=["infra"])
 async def health():
     return {"status": "ok", "version": "0.1.0"}
-
-
-@app.on_event("startup")
-async def startup():
-    import os
-    for d in ["sessions", "graphs", "logs", "reports", "cache"]:
-        os.makedirs(f"{settings.data_dir}/{d}", exist_ok=True)
-    log.info("argus.startup", data_dir=settings.data_dir)

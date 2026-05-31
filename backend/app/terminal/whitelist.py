@@ -31,7 +31,7 @@ WHITELIST: dict[str, dict] = {
 
 ALWAYS_BLOCKED = ["rm", "sudo", "su", "chmod", "chown", "dd", "mkfs", "wget", "python",
                    "python3", "bash", "sh", "zsh", "nc", "netcat", "socat", "ssh", "scp",
-                   "curl --upload-file", "iptables", "kill", "pkill", "systemctl"]
+                   "iptables", "kill", "pkill", "systemctl"]
 
 
 class CommandVerdict:
@@ -39,6 +39,23 @@ class CommandVerdict:
         self.allowed = allowed
         self.reason = reason
         self.sanitized = sanitized or []
+
+
+def _is_flag(tok: str) -> bool:
+    return tok.startswith("-") and tok != "-"
+
+
+def _flag_allowed(tok: str, allowed: list[str]) -> bool:
+    """A flag token is allowed if it matches an allowed flag exactly, as the
+    `--flag` part of `--flag=value`, or as a short flag with an attached numeric
+    value (e.g. `-p80`, `-p1-1000`)."""
+    base = tok.split("=", 1)[0]
+    for af in allowed:
+        if tok == af or base == af:
+            return True
+        if len(af) == 2 and tok.startswith(af) and not tok[2:3].isalpha():
+            return True
+    return False
 
 
 def check_command(raw: str) -> CommandVerdict:
@@ -50,6 +67,9 @@ def check_command(raw: str) -> CommandVerdict:
         parts = shlex.split(raw)
     except ValueError as e:
         return CommandVerdict(False, f"Parse error: {e}")
+
+    if not parts:
+        return CommandVerdict(False, "Empty command")
 
     binary = parts[0].lstrip("./").split("/")[-1]
 
@@ -66,8 +86,22 @@ def check_command(raw: str) -> CommandVerdict:
     if len(args) > policy["max_args"]:
         return CommandVerdict(False, f"Too many arguments (max {policy['max_args']})")
 
+    # Explicit denylist. Multi-word entries (e.g. "-X DELETE") are matched against
+    # the raw string since shlex splits them into separate tokens; single flags are
+    # matched token-wise to avoid substring false-positives (e.g. "-O" inside a URL).
     for blocked in policy["blocked_flags"]:
-        if blocked in args or blocked in raw:
+        if (blocked in raw) if " " in blocked else (blocked in args):
             return CommandVerdict(False, f"Flag '{blocked}' is blocked for {binary}")
+
+    # Allowlist enforcement: when a binary declares allowed_flags, every flag token
+    # must be on the list. Positional arguments (targets, URLs, ports) are allowed.
+    # This is what turns the policy from a denylist into a real allowlist, and it
+    # also rejects argument-injection like `curl http://x; rm -rf /` (the `-rf`).
+    allowed = policy["allowed_flags"]
+    if allowed:
+        for tok in args:
+            if _is_flag(tok) and not _flag_allowed(tok, allowed):
+                return CommandVerdict(False,
+                    f"Flag '{tok}' is not in the allowlist for {binary}")
 
     return CommandVerdict(True, "OK", parts)

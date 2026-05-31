@@ -122,13 +122,10 @@ async def load_audit(session_id: str) -> list[dict]:
 
 # ── TTL janitor ───────────────────────────────────────────────────────────────
 
-SESSION_TTL_SECONDS = 60 * 60 * 24  # 24 hours
-
-
 async def ttl_janitor() -> int:
     """Delete sessions older than TTL. Returns count of deleted sessions."""
     deleted = 0
-    cutoff = time.time() - SESSION_TTL_SECONDS
+    cutoff = time.time() - settings.session_ttl_hours * 3600
     d = _sessions_dir()
     if not d.exists():
         return 0

