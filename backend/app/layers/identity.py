@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from app.layers.base import BaseLayer
+from app.layers.xlayer import _l4_agent_compromise
 from app.engine.target_profile import jitter, gate
 
 if TYPE_CHECKING:
@@ -81,6 +82,29 @@ class IdentityLayer(BaseLayer):
                 evidence={**check["evidence"], "cve_class": check["cve_class"]},
                 exploitable=check["exploitable"],
                 confidence=jitter(target, f"l8-{check['id']}-conf", check["confidence"], 0.08),
+            ))
+
+        # ── Cross-layer L4 → L8: compromised agent escalates / persists ──────────
+        # A hijacked agent (L4) plus a weak identity boundary means the foothold
+        # becomes durable: over-broad / leaked tokens give attacker re-entry that
+        # survives a single-session cleanup.
+        compromise = _l4_agent_compromise(state)
+        if compromise:
+            id_weaknesses = [f for f in findings
+                             if f.exploitable and f.layer == 8]
+            findings.append(self._finding(
+                title="Compromised agent escalates via weak identity boundary — durable re-entry",
+                severity="critical",
+                owasp_ref="A01:2021", mitre_ref="AML.T0048",
+                evidence={
+                    "source_layer": 4,
+                    "source_findings": [f.id for f in compromise],
+                    "identity_weaknesses": [f.id for f in id_weaknesses],
+                    "rationale": "The L4-hijacked agent reuses over-broad or leaked credentials, so "
+                                 "the attacker retains access beyond the initial session.",
+                },
+                exploitable=True,
+                confidence=jitter(target, "l8-from-l4", 0.85, 0.07),
             ))
 
         if not findings:

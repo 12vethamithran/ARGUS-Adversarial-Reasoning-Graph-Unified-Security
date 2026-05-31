@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import networkx as nx
 
 from app.layers.base import BaseLayer
+from app.layers.xlayer import _l4_agent_compromise
 from app.engine.target_profile import target_seed, jitter
 
 if TYPE_CHECKING:
@@ -114,5 +115,26 @@ class MultiAgentLayer(BaseLayer):
             evidence={"topology_edges": list(G.edges()), "missing_control": "message signing / origin verification"},
             exploitable=False, confidence=0.87,
         ))
+
+        # ── Cross-layer L4 → L7: confirmed compromise seeds the mesh ─────────────
+        # L4 proved an agent issues attacker-controlled tool calls. That agent is a
+        # real infection seed, so mesh propagation is reachable, not hypothetical.
+        compromise = _l4_agent_compromise(state)
+        if compromise:
+            findings.append(self._finding(
+                title="Confirmed L4 agent compromise seeds prompt-infection across the mesh",
+                severity="critical" if infection_rate > 0.3 else "high",
+                owasp_ref="OWASP-AGT-09", mitre_ref="AML.T0051",
+                evidence={
+                    "source_layer": 4,
+                    "source_findings": [f.id for f in compromise],
+                    "seeded_infection_rate": round(infection_rate, 2),
+                    "infected_agents": list(result["infected"].keys()),
+                    "rationale": "The L4-hijacked agent forwards attacker instructions over unsigned "
+                                 "inter-agent channels, so the infection spreads from a real seed.",
+                },
+                exploitable=True,
+                confidence=jitter(target, "l7-from-l4", 0.85, 0.07),
+            ))
 
         return findings
