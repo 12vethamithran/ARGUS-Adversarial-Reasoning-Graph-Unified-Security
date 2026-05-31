@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from app.layers.base import BaseLayer
+from app.engine.target_profile import jitter
 from app.models.finding import Finding
 
 if TYPE_CHECKING:
@@ -15,6 +16,9 @@ MOCK_MCP_TOOLS = [
     {"name": "web_fetch",      "perms": ["network:outbound"],  "validates_url": False},
     {"name": "db_query",       "perms": ["db:read","db:write"],"validates_query": False},
 ]
+
+# Tools whose permissions make them dangerous sinks for an injected tool call.
+_SINK_PERMS = {"shell:exec", "db:write", "email:send", "network:outbound"}
 
 ATTACK_SCENARIOS = [
     {
@@ -123,4 +127,43 @@ class MCPAgentLayer(BaseLayer):
                 confidence=scenario["confidence"],
             ))
 
+        # ── Cross-layer L3 → L4: poisoned context drives the tool call ───────────
+        # A poisoned RAG corpus is the delivery mechanism: retrieval injects
+        # attacker instructions into the agent context, which then issues a tool
+        # call. This upgrades MCP-001 from hypothetical to a reachable path that
+        # terminates at a real write/exec sink tool.
+        poison = self._l3_poison_vectors(state)
+        if poison:
+            sinks = [
+                t["name"] for t in MOCK_MCP_TOOLS
+                if set(t["perms"]) & _SINK_PERMS
+                and any(v is False for k, v in t.items() if k.startswith("validates_"))
+            ]
+            findings.append(self._finding(
+                title="Poisoned RAG context steers agent into unsafe tool call "
+                      "(injection → tool-call hijack)",
+                severity="critical",
+                owasp_ref="OWASP-AGT-01", mitre_ref="AML.T0043",
+                evidence={
+                    "source_layer": 3,
+                    "source_findings": [f.id for f in poison],
+                    "sink_tools": sinks,
+                    "rationale": "Retrieved poisoned documents inject instructions into the agent's "
+                                 "context; with no per-call authorization the agent forwards them to "
+                                 "a write/exec tool — a confirmed delivery path, not a standalone bug.",
+                },
+                exploitable=True,
+                confidence=jitter(target, "l4-poison-toolcall", 0.87, 0.07),
+            ))
+
         return findings
+
+    # ── Cross-layer L3 → L4 wiring ─────────────────────────────────────────────
+    def _l3_poison_vectors(self, state: "ArgusState") -> list[Finding]:
+        """Exploitable L3 findings indicating a poisoned/persisted corpus."""
+        kws = ("poison", "corpus", "displacement", "persistence", "adversarial", "retrieval")
+        return [
+            f for f in state.findings.values()
+            if f.layer == 3 and f.exploitable
+            and ((f.owasp_ref or "").startswith("LLM08") or any(k in f.title.lower() for k in kws))
+        ]
