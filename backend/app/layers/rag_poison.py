@@ -134,4 +134,40 @@ class RAGPoisonLayer(BaseLayer):
             confidence=0.74,
         ))
 
+        # ── Cross-layer L2 → L3: injection persistence ───────────────────────────
+        # An exploitable L2 injection can WRITE attacker content into this corpus,
+        # turning a per-session injection into a durable, cross-session poison.
+        vectors = self._l2_injection_vectors(state)
+        if vectors:
+            params = sorted({(v.evidence or {}).get("param") for v in vectors
+                             if (v.evidence or {}).get("param")})
+            findings.append(self._finding(
+                title="Injection persistence: L2 prompt-injection payload writable into RAG corpus "
+                      "(survives session cleanup)",
+                severity="critical",
+                owasp_ref="LLM08:2025",
+                mitre_ref="AML.T0020",
+                evidence={
+                    "source_layer": 2,
+                    "source_findings": [v.id for v in vectors],
+                    "channels": params,
+                    "rationale": "Attacker content delivered via the L2 injection vector can be "
+                                 "stored as a corpus document, so retrieval re-serves it to future "
+                                 "sessions — persistence beyond a single-session cleanup.",
+                },
+                exploitable=True,
+                confidence=jitter(target, "l3-persistence", 0.86, 0.08),
+            ))
+
         return findings
+
+    # ── Cross-layer L2 → L3 wiring ─────────────────────────────────────────────
+    def _l2_injection_vectors(self, state: "ArgusState") -> list[Finding]:
+        """Exploitable L2 findings that represent a usable injection vector."""
+        out = []
+        for f in state.findings.values():
+            if f.layer != 2 or not f.exploitable:
+                continue
+            if (f.owasp_ref or "").startswith("LLM01") or "injection" in f.title.lower():
+                out.append(f)
+        return out
