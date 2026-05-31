@@ -23,17 +23,12 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install pip-audit
-        run: pip install pip-audit
+      - name: Install dependencies + pip-audit
+        run: pip install -e "." pip-audit
 
-      - name: Audit dependencies
-        run: pip-audit -r <(pip install -e "." --dry-run 2>&1 | grep "Would install" | sed 's/Would install //' | tr ' ' '\n' | sed 's/-[0-9].*//')
+      - name: Audit Python dependencies
+        run: pip-audit --skip-editable
         continue-on-error: true
-
-      - name: Install and audit directly
-        run: |
-          pip install -e "."
-          pip-audit --skip-editable || true
 
   npm-audit:
     name: Node dependency audit
@@ -53,6 +48,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit
+      - name: Audit Node dependencies
         run: npm audit --audit-level=high
         continue-on-error: true
