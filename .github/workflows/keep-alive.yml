@@ -13,7 +13,8 @@ jobs:
     steps:
       - name: Health check
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RENDER_BACKEND_URL }}/health")
+          BACKEND_URL=$(echo "${{ secrets.RENDER_BACKEND_URL }}" | tr -d '[:space:]')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health")
           echo "Health check status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "::warning::Backend returned $STATUS — may be cold starting"

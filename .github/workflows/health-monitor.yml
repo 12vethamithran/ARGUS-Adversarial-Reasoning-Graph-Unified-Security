@@ -14,8 +14,9 @@ jobs:
       - name: Check backend /health
         id: backend
         run: |
-          RESPONSE=$(curl -s --max-time 15 "${{ secrets.RENDER_BACKEND_URL }}/health")
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ secrets.RENDER_BACKEND_URL }}/health")
+          BACKEND_URL=$(echo "${{ secrets.RENDER_BACKEND_URL }}" | tr -d '[:space:]')
+          RESPONSE=$(curl -s --max-time 15 "$BACKEND_URL/health")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$BACKEND_URL/health")
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
           echo "Backend status: $STATUS | Response: $RESPONSE"
@@ -23,8 +24,9 @@ jobs:
       - name: Check frontend
         id: frontend
         run: |
+          FRONTEND_URL=$(echo "${{ secrets.VERCEL_FRONTEND_URL }}" | tr -d '[:space:]')
           for i in {1..3}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ secrets.VERCEL_FRONTEND_URL }}")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$FRONTEND_URL")
             echo "Attempt $i — Frontend status: $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "status=$STATUS" >> $GITHUB_OUTPUT
@@ -36,7 +38,8 @@ jobs:
 
       - name: Check backend docs reachable
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ secrets.RENDER_BACKEND_URL }}/docs")
+          BACKEND_URL=$(echo "${{ secrets.RENDER_BACKEND_URL }}" | tr -d '[:space:]')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$BACKEND_URL/docs")
           echo "API docs status: $STATUS"
 
       - name: Fail if backend is down
