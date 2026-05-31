@@ -165,7 +165,8 @@ async def start_analysis(body: StartAnalysisBody):
     session_id = str(ULID())
     layers = body.layers or ([1, 2, 3] if body.mode == "basic" else list(range(1, 9)))
     target = body.target.model_dump(exclude_none=True)
-    use_real = bool(target.get("url") or target.get("llm_endpoint"))
+    # A manifest enables the real L6 supply-chain scan even with no url/endpoint.
+    use_real = bool(target.get("url") or target.get("llm_endpoint") or target.get("manifest"))
 
     async def stream():
         if use_real:

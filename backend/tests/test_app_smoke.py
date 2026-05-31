@@ -42,3 +42,16 @@ def test_session_create_get_list_roundtrip(client):
 
 def test_get_missing_session_404(client):
     assert client.get("/api/sessions/01DOESNOTEXIST0000000000000").status_code == 404
+
+
+def test_manifest_only_target_uses_real_l6_scan(client):
+    # requests==2.30.0 -> CVE-2023-32681, which is in the real KB but NOT the mock
+    # stream. Its presence proves a manifest-only target took the real path.
+    body = {
+        "mode": "advanced",
+        "target": {"description": "internal service", "manifest": "requests==2.30.0\n"},
+        "layers": [6],
+    }
+    r = client.post("/api/analyze", json=body)
+    assert r.status_code == 200
+    assert "CVE-2023-32681" in r.text
