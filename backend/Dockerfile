@@ -27,10 +27,10 @@ RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY backend/pyproject.toml ./
 RUN pip install --no-cache-dir -e "."
 
-COPY . .
+COPY backend/ .
 
 EXPOSE 8000
 
