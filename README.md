@@ -9,6 +9,9 @@
 ![Backend](https://img.shields.io/badge/backend-FastAPI%20%7C%20Python%203.12-0ea5e9)
 ![Frontend](https://img.shields.io/badge/frontend-React%2018%20%7C%20Vite%20%7C%20TS-ff3d57)
 ![Standards](https://img.shields.io/badge/maps%20to-OWASP%20%2B%20MITRE%20ATLAS-ffb300)
+[![CI](https://github.com/12vethamithran/ARGUS-Adversarial-Reasoning-Graph-Unified-Security/actions/workflows/ci.yml/badge.svg)](https://github.com/12vethamithran/ARGUS-Adversarial-Reasoning-Graph-Unified-Security/actions/workflows/ci.yml)
+[![CD](https://github.com/12vethamithran/ARGUS-Adversarial-Reasoning-Graph-Unified-Security/actions/workflows/cd.yml/badge.svg)](https://github.com/12vethamithran/ARGUS-Adversarial-Reasoning-Graph-Unified-Security/actions/workflows/cd.yml)
+[![Security](https://github.com/12vethamithran/ARGUS-Adversarial-Reasoning-Graph-Unified-Security/actions/workflows/security.yml/badge.svg)](https://github.com/12vethamithran/ARGUS-Adversarial-Reasoning-Graph-Unified-Security/actions/workflows/security.yml)
 
 </div>
 
@@ -182,6 +185,85 @@ ARGUS/
 ## Security & Ethics
 
 ARGUS is built for **authorized security testing only**. Reason about and test **only systems you own or have explicit written permission to assess**. The terminal is restricted to a non-destructive recon whitelist with exploit flags blocked, rate limiting, and idle timeouts — but **you** are responsible for staying within authorization. Secrets (`.env`) and runtime data (`data/`) are git-ignored and must never be committed.
+
+---
+
+---
+
+## Production Deployment
+
+### Live Services
+
+| Service | Platform | Notes |
+|---------|----------|-------|
+| Backend API | [Render](https://render.com) | Docker, persistent `/data` disk (5 GB) |
+| Frontend | [Vercel](https://vercel.com) | Static SPA, auto-deploys on push to `main` |
+
+### Backend → Render
+
+**Service settings:**
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `backend` |
+| Runtime | Docker |
+| Dockerfile Path | `./Dockerfile` |
+| Health Check Path | `/health` |
+| Plan | Starter (required for WebSocket) |
+| Disk | `argus-data` mounted at `/data` |
+
+**Environment variables:**
+
+| Key | Value |
+|-----|-------|
+| `GEMINI_API_KEY` | Your Gemini API key |
+| `ALLOWED_ORIGINS` | Your Vercel frontend URL |
+| `DATA_DIR` | `/data` |
+| `SESSION_TTL_HOURS` | `24` |
+| `LOG_LEVEL` | `INFO` |
+
+### Frontend → Vercel
+
+**Project settings:**
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `frontend` |
+| Framework | Vite |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+
+**Environment variables:**
+
+| Key | Value |
+|-----|-------|
+| `VITE_API_URL` | `https://your-render-url.onrender.com` |
+| `VITE_WS_URL` | `wss://your-render-url.onrender.com` |
+
+---
+
+## CI / CD & Monitoring
+
+Five GitHub Actions workflows run automatically:
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `CI` | Every push / PR | Backend pytest + frontend typecheck & Vite build |
+| `CD` | Push to `main` (backend changes) | Triggers Render redeploy via deploy hook |
+| `Keep Alive` | Every 10 minutes | Pings `/health` to prevent Render cold starts |
+| `Health Monitor` | Every hour | Checks backend `/health` + frontend URL; fails job if backend is down |
+| `Security Scan` | Push to `main` + weekly Monday | `pip-audit` on Python deps + `npm audit` on Node deps |
+
+### Required GitHub Secrets
+
+Go to **Repo → Settings → Secrets and variables → Actions** and add:
+
+| Secret | Description |
+|--------|-------------|
+| `RENDER_BACKEND_URL` | Full Render service URL (no trailing slash) |
+| `RENDER_DEPLOY_HOOK_URL` | Render → Service → Settings → Deploy Hook |
+| `VERCEL_FRONTEND_URL` | Full Vercel app URL (no trailing slash) |
+| `GEMINI_API_KEY` | Used by CI backend tests |
 
 ---
 
