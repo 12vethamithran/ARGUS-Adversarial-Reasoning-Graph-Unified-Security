@@ -163,12 +163,14 @@ class LLMProbeLayer(BaseLayer):
         url: str | None = target.get("url")
         description: str | None = target.get("description", "") or ""
 
+        findings: list[Finding]
+
         # 1. Explicit endpoint → probe it directly.
         if endpoint:
-            return await self._probe_endpoint(target, endpoint, working_schema=None)
+            findings = await self._probe_endpoint(target, endpoint, working_schema=None)
 
         # 2. No endpoint but a URL → try to discover one.
-        if url:
+        elif url:
             discovered, schema, fp = await self._discover_endpoint(url)
             if discovered:
                 findings = [self._finding(
@@ -178,11 +180,80 @@ class LLMProbeLayer(BaseLayer):
                     exploitable=False, confidence=0.85,
                 )]
                 findings += await self._probe_endpoint(target, discovered, working_schema=schema)
-                return findings
-            # URL given but no LLM endpoint found — fall through to hypothetical.
+            else:
+                # URL given but no LLM endpoint found — fall back to hypothetical.
+                findings = self._hypothetical(target, description)
 
         # 3. Hypothetical analysis from description keywords (target-derived confidence).
-        return self._hypothetical(target, description)
+        else:
+            findings = self._hypothetical(target, description)
+
+        # 4. Cross-layer: turn L1 reflected-input channels into indirect
+        #    prompt-injection vectors when the target is LLM-powered.
+        findings += await self._indirect_injection_from_l1(target, description, state)
+        return findings
+
+    # ── Cross-layer L1 → L2 wiring ─────────────────────────────────────────────
+    def _l1_channels(self, state: "ArgusState") -> list[dict]:
+        """Reflected-input channels discovered by L1 (param + URL)."""
+        channels = []
+        for f in state.findings.values():
+            if f.layer == 1 and "reflected" in f.title.lower():
+                ev = f.evidence or {}
+                channels.append({"param": ev.get("param", "q"), "url": ev.get("url", "")})
+        return channels
+
+    async def _indirect_injection_from_l1(
+        self, target: dict, description: str, state: "ArgusState"
+    ) -> list[Finding]:
+        channels = self._l1_channels(state)
+        if not channels:
+            return []
+
+        # Is the target plausibly LLM-backed? (description signal or an LLM endpoint).
+        desc = (description or "").lower()
+        llm_backed = bool(target.get("llm_endpoint")) or any(
+            k in desc for k in ["chatbot", "llm", "gpt", "claude", "gemini", "ai assistant",
+                                "copilot", "rag", "agent", "assistant"]
+        ) or any(f.layer == 2 and f.exploitable for f in state.findings.values())
+
+        findings: list[Finding] = []
+        for ch in channels:
+            # Lightly verify the channel still carries attacker markup into output.
+            proof = "ARGUSINJ" + (ch["param"] or "q").upper()[:4]
+            verified = await self._reflects_payload(ch.get("url", ""), ch["param"], proof)
+            sev = "critical" if llm_backed else "medium"
+            findings.append(self._finding(
+                title=("Indirect prompt-injection channel: L1 reflected param "
+                       f"'{ch['param']}' reaches LLM context"
+                       if llm_backed else
+                       f"Reflected param '{ch['param']}' is an untrusted-content channel (no LLM confirmed)"),
+                severity=sev, owasp_ref="LLM01:2025", mitre_ref="AML.T0051",
+                evidence={
+                    "param": ch["param"], "source_layer": 1,
+                    "channel_verified": verified,
+                    "rationale": "Attacker-controlled web input reflected by L1 can deliver "
+                                 "injection payloads into a model's context (indirect injection).",
+                },
+                exploitable=llm_backed,
+                confidence=jitter(target, f"l2-indirect-{ch['param']}", 0.84 if verified else 0.7, 0.08),
+            ))
+        return findings
+
+    async def _reflects_payload(self, url: str, param: str, proof: str) -> bool:
+        """Confirm a marker injected via `param` is echoed back unescaped."""
+        if not url or not param:
+            return False
+        try:
+            base = url.split("#", 1)[0]
+            sep = "&" if "?" in base else "?"
+            probe = f"{base}{sep}{param}={proof}"
+            async with httpx.AsyncClient(timeout=httpx.Timeout(6.0), verify=False,
+                                         follow_redirects=True) as client:
+                r = await client.get(probe)
+            return proof in r.text
+        except Exception:
+            return False
 
     # ── Endpoint discovery ────────────────────────────────────────────────────
     async def _discover_endpoint(self, base_url: str) -> tuple[str | None, str | None, str | None]:
