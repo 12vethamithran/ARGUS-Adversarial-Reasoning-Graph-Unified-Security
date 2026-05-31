@@ -35,6 +35,51 @@ SECURITY_HEADERS = [
     ("Permissions-Policy",      "Missing Permissions-Policy", "info", "A05:2021"),
 ]
 
+# Sensitive paths probed concurrently. (path, severity, exploitable, owasp_ref).
+# Each hit is confirmed by a content signature (_looks_exposed) so that SPAs /
+# catch-all 200 routes don't produce false positives.
+SENSITIVE_PATHS = [
+    ("/.env",                     "critical", True,  "A05:2021"),
+    ("/.git/config",              "critical", True,  "A05:2021"),
+    ("/.git/HEAD",                "high",     True,  "A05:2021"),
+    ("/.aws/credentials",         "critical", True,  "A02:2021"),
+    ("/config.json",              "high",     True,  "A05:2021"),
+    ("/actuator/env",             "high",     True,  "A05:2021"),
+    ("/server-status",            "medium",   False, "A05:2021"),
+    ("/swagger.json",             "low",      False, "A05:2021"),
+    ("/.well-known/security.txt", "info",     False, "A05:2021"),
+]
+
+# Reflected-input canary: a unique token wrapped in markup that, if it appears
+# unescaped in the response, proves the input reaches the page without encoding.
+REFLECT_CANARY = "argus<xss>7f3a"
+
+
+def _looks_exposed(path: str, status: int, text: str) -> bool:
+    """Confirm a sensitive path is genuinely exposed via a content signature."""
+    if status != 200:
+        return False
+    t = text[:4000]
+    tl = t.lower()
+    if path == "/.env":
+        return "=" in t and "<html" not in tl and any(
+            k in t for k in ("KEY", "SECRET", "PASSWORD", "TOKEN", "DB_", "API"))
+    if path.startswith("/.git"):
+        return t.startswith("ref:") or "[core]" in t
+    if path == "/.aws/credentials":
+        return "aws_access_key" in tl
+    if path == "/actuator/env":
+        return t.lstrip().startswith("{") and "propertySources" in t
+    if path == "/server-status":
+        return "Apache Server Status" in t
+    if path == "/swagger.json":
+        return '"swagger"' in tl or '"openapi"' in tl
+    if path == "/config.json":
+        return t.lstrip().startswith("{")
+    if path == "/.well-known/security.txt":
+        return "contact:" in tl
+    return False
+
 
 class WebLayer(BaseLayer):
     layer_id = 1
@@ -134,6 +179,95 @@ class WebLayer(BaseLayer):
                     evidence={"allow": allow},
                     exploitable=True, confidence=0.7,
                 ))
+        except Exception:
+            pass
+
+        # ── Cleartext transport ──────────────────────────────────────────
+        final_url = str(resp.url)
+        if final_url.startswith("http://"):
+            findings.append(self._finding(
+                title="Site served over cleartext HTTP (no TLS)",
+                severity="medium", owasp_ref="A02:2021",
+                evidence={"final_url": final_url},
+                exploitable=False, confidence=0.9,
+            ))
+
+        # ── Cookie security flags ────────────────────────────────────────
+        _get_list = getattr(resp.headers, "get_list", None)
+        cookies = _get_list("set-cookie") if _get_list else (
+            [resp.headers["set-cookie"]] if "set-cookie" in resp.headers else [])
+        for raw in cookies:
+            cl = raw.lower()
+            name = raw.split("=", 1)[0].strip()
+            missing = [flag for flag, tok in
+                       (("Secure", "secure"), ("HttpOnly", "httponly"), ("SameSite", "samesite"))
+                       if tok not in cl]
+            if missing:
+                findings.append(self._finding(
+                    title=f"Cookie '{name}' missing flags: {', '.join(missing)}",
+                    severity="low", owasp_ref="A05:2021",
+                    evidence={"cookie": name, "missing_flags": missing},
+                    exploitable=False, confidence=0.85,
+                ))
+
+        # ── Directory listing ────────────────────────────────────────────
+        if "<title>Index of /" in body or "Directory listing for" in body:
+            findings.append(self._finding(
+                title="Directory listing enabled",
+                severity="medium", owasp_ref="A05:2021",
+                evidence={"url": final_url},
+                exploitable=False, confidence=0.8,
+            ))
+
+        # ── Reflected input (XSS surface) ────────────────────────────────
+        try:
+            sep = "&" if "?" in url else "?"
+            probe_url = f"{url}{sep}q={REFLECT_CANARY}"
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(6.0), verify=False, follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
+            ) as client:
+                rprobe = await client.get(probe_url)
+            if REFLECT_CANARY in rprobe.text:  # echoed back unescaped
+                findings.append(self._finding(
+                    title="Reflected user input rendered unescaped (XSS surface)",
+                    severity="high", owasp_ref="A03:2021", mitre_ref="T1059",
+                    evidence={"param": "q", "canary": REFLECT_CANARY, "url": probe_url},
+                    exploitable=True, confidence=0.8,
+                ))
+        except Exception:
+            pass
+
+        # ── Sensitive path exposure (concurrent) ─────────────────────────
+        base = final_url.split("?", 1)[0].rstrip("/")
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=4.0, read=6.0, write=4.0, pool=4.0),
+                verify=False, follow_redirects=False,
+                headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
+            ) as client:
+                async def _probe(p: str):
+                    try:
+                        return p, await client.get(base + p)
+                    except Exception:
+                        return p, None
+
+                results = await asyncio.gather(
+                    *(_probe(p) for p, _s, _e, _o in SENSITIVE_PATHS)
+                )
+            sig = {p: (sev, exp, owasp) for p, sev, exp, owasp in SENSITIVE_PATHS}
+            for path, r in results:
+                if r is None:
+                    continue
+                sev, exp, owasp = sig[path]
+                if _looks_exposed(path, r.status_code, r.text):
+                    findings.append(self._finding(
+                        title=f"Sensitive path exposed: {path}",
+                        severity=sev, owasp_ref=owasp,
+                        evidence={"path": path, "status": r.status_code,
+                                  "sample": r.text[:120]},
+                        exploitable=exp, confidence=0.88,
+                    ))
         except Exception:
             pass
 
