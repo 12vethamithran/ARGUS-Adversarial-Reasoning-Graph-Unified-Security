@@ -4,6 +4,17 @@ import { toast } from "../components/ui/Toast";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+// Surface the resolved backend base at load so "cannot reach backend" is
+// diagnosable from the browser console without source-mapping the build.
+if (!API_BASE) {
+  console.warn(
+    "[ARGUS] VITE_API_URL is not set — API calls go to this site's own origin " +
+      "and will 404. Set VITE_API_URL to your backend URL and rebuild.",
+  );
+} else {
+  console.info(`[ARGUS] API base: ${API_BASE}`);
+}
+
 export function startAnalysisStream(
   target: AnalysisTarget,
   mode: AnalysisMode,
@@ -21,7 +32,9 @@ export function startAnalysisStream(
         body: JSON.stringify({ mode, target, layers }),
       });
     } catch (e: any) {
-      toast.error("Cannot reach backend — is it running on :8000?");
+      const where = API_BASE || "(this site's own origin — VITE_API_URL is unset)";
+      toast.error(`Cannot reach backend at ${where}. Check VITE_API_URL / CORS.`);
+      console.error("[ARGUS] analyze fetch failed for", `${API_BASE}/api/analyze`, e);
       throw e;
     }
 
