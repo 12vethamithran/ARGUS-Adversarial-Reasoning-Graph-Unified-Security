@@ -1,11 +1,24 @@
-"""Layer 6 — Supply Chain (SkillJect/STAC). pip-audit + typosquat detection."""
+"""Layer 6 — Supply Chain (SkillJect/STAC).
+
+Two modes:
+  * Real scan — if the target supplies a dependency manifest, parse it and match
+    pinned versions against the bundled known-vuln KB (deterministic, no network),
+    plus typosquat-check the actually-declared package names.
+  * Heuristic — otherwise, surface candidate issues probabilistically per target.
+"""
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
 from app.layers.base import BaseLayer
+from app.models.finding import Finding
 from app.engine.target_profile import jitter, gate
+from app.kb.vuln_db import match_vulns, POPULAR_PACKAGES
+from app.kb.manifest import parse_manifest
 
 if TYPE_CHECKING:
     from app.engine.state import ArgusState
+
+_SEV_CONF = {"critical": 0.97, "high": 0.95, "medium": 0.9, "low": 0.85, "info": 0.7}
 
 # Known vulnerable packages (mock — real mode uses pip-audit)
 MOCK_VULNERABLE = [
@@ -40,6 +53,11 @@ class SupplyChainLayer(BaseLayer):
     layer_name = "Supply Chain"
 
     async def run(self, target: dict, state: "ArgusState") -> list[Finding]:
+        # Real scan path — deterministic detection from an actual manifest.
+        manifest = target.get("manifest")
+        if manifest and manifest.strip():
+            return self._real_scan(manifest)
+
         findings = []
 
         # Vulnerable dependency scan. Without a real SBOM we can't know a target's
@@ -102,4 +120,49 @@ class SupplyChainLayer(BaseLayer):
                 exploitable=False, confidence=0.6,
             ))
 
+        return findings
+
+    # ── Real manifest scan ─────────────────────────────────────────────────────
+    def _real_scan(self, manifest: str) -> list["Finding"]:
+        ecosystem, deps = parse_manifest(manifest)
+        findings: list[Finding] = []
+        popular = POPULAR_PACKAGES.get(ecosystem, set())
+
+        for name, version in deps:
+            # 1. Known-CVE match on pinned versions (deterministic).
+            if version:
+                for rec in match_vulns(ecosystem, name, version):
+                    findings.append(self._finding(
+                        title=f"Vulnerable dependency: {name}=={version} ({rec['cve']})",
+                        severity=rec["severity"], owasp_ref="A06:2021", mitre_ref="AML.T0019",
+                        evidence={"package": name, "version": version, "cve": rec["cve"],
+                                  "description": rec["desc"], "ecosystem": ecosystem,
+                                  "source": "ARGUS bundled vuln KB"},
+                        exploitable=True,
+                        confidence=_SEV_CONF.get(rec["severity"], 0.9),
+                    ))
+
+            # 2. Typosquat — a declared name that is a near-miss of a popular one.
+            lname = name.lower()
+            if lname not in popular:
+                for legit in popular:
+                    d = _levenshtein(lname, legit)
+                    if 1 <= d <= 2:
+                        findings.append(self._finding(
+                            title=f"Possible typosquatted dependency: '{name}' ~ '{legit}'",
+                            severity="high", owasp_ref="A06:2021", mitre_ref="AML.T0019",
+                            evidence={"declared": name, "looks_like": legit, "edit_distance": d,
+                                      "ecosystem": ecosystem},
+                            exploitable=True, confidence=0.8,
+                        ))
+                        break
+
+        if not findings:
+            findings.append(self._finding(
+                title=f"No known-vulnerable dependencies found in {ecosystem} manifest ({len(deps)} deps scanned)",
+                severity="info", owasp_ref="A06:2021",
+                evidence={"ecosystem": ecosystem, "deps_scanned": len(deps),
+                          "source": "ARGUS bundled vuln KB"},
+                exploitable=False, confidence=0.9,
+            ))
         return findings

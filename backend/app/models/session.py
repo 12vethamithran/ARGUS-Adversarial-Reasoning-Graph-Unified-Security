@@ -14,6 +14,7 @@ class AnalysisTarget(BaseModel):
     url: str | None = None
     llm_endpoint: str | None = None
     description: str | None = None  # hypothetical target description
+    manifest: str | None = None    # requirements.txt / package.json contents for real L6 scan
 
 
 class Session(BaseModel):
