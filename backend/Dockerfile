@@ -34,4 +34,6 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Honor the platform-injected $PORT (Render/Heroku/etc.); default to 8000 locally.
+# Shell form so ${PORT} is expanded at runtime.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
