@@ -15,11 +15,13 @@ app = FastAPI(
 
 # CORS — explicit allow-list plus a dev regex so any localhost / 127.0.0.1
 # port works (Vite may pick 5174+, and 127.0.0.1 ≠ localhost for CORS).
+_origins = settings.get_allowed_origins()
+_wildcard = _origins == ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_allowed_origins(),
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if not _wildcard else None,
+    allow_credentials=not _wildcard,  # credentials + wildcard is rejected by browsers
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Session-Id"],

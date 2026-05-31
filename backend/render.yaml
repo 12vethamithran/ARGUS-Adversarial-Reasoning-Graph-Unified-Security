@@ -2,7 +2,7 @@ services:
   - type: web
     name: argus-backend
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     plan: starter
     healthCheckPath: /health
     envVars:
