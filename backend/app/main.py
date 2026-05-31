@@ -61,6 +61,17 @@ app.include_router(terminal.router, prefix="/ws", tags=["terminal"])
 app.include_router(report.router, prefix="/api/reports", tags=["reports"])
 
 
+@app.get("/", tags=["infra"])
+async def root():
+    return {
+        "service": "ARGUS API",
+        "description": "Adversarial Reasoning & Graph-based Unified Security Framework",
+        "version": "0.1.0",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health", tags=["infra"])
 async def health():
     return {"status": "ok", "version": "0.1.0"}
