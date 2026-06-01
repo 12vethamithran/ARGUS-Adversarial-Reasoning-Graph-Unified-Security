@@ -26,6 +26,12 @@ MOCK_VULNERABLE = [
      "desc": "Arbitrary code execution via malicious prompt template"},
     {"package": "transformers", "version": "4.35.0", "cve": "CVE-2024-3568", "severity": "medium",
      "desc": "Deserialization of untrusted data in model loading"},
+    {"package": "pyyaml", "version": "5.3.1", "cve": "CVE-2020-14343", "severity": "critical",
+     "desc": "Arbitrary code execution via unsafe full_load of untrusted YAML"},
+    {"package": "requests", "version": "2.19.0", "cve": "CVE-2018-18074", "severity": "high",
+     "desc": "Credentials leaked to redirect target across https->http downgrade"},
+    {"package": "llama-index", "version": "0.9.0", "cve": "CVE-2024-4181", "severity": "high",
+     "desc": "Prompt-template injection enabling SSRF/file read in RAG ingestion"},
 ]
 
 # Typosquat candidates for popular AI packages
@@ -34,6 +40,9 @@ TYPOSQUAT_PAIRS = [
     ("openai", "0penai", "open-ai-sdk", "openai-unofficial"),
     ("transformers", "transfomers", "transformer-ai", "huggingface-transformers"),
     ("sentence-transformers", "sentence_transformers2", "sentencetransformers"),
+    ("numpy", "nunpy", "numpi", "num-py"),
+    ("requests", "reqeusts", "request", "requsts"),
+    ("llama-index", "llama_index2", "llamaindex", "llama-indx"),
 ]
 
 def _levenshtein(a: str, b: str) -> int:

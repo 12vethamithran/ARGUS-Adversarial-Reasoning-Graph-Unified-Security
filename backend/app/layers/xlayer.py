@@ -13,6 +13,29 @@ if TYPE_CHECKING:
     from app.models.finding import Finding
 
 
+def _l1_injection(state: "ArgusState") -> list["Finding"]:
+    """Exploitable L1 injection findings (SQLi/SSTI/cmdi/XSS/traversal).
+
+    These are attacker-controlled input sinks that downstream layers can treat
+    as confirmed entry points (e.g. an injectable param feeding an LLM context).
+    """
+    inj_families = {"sqli", "ssti", "cmdi", "xss", "traversal"}
+    return [
+        f for f in state.findings.values()
+        if f.layer == 1 and f.exploitable
+        and (f.evidence or {}).get("family") in inj_families
+    ]
+
+
+def _l1_ssrf(state: "ArgusState") -> list["Finding"]:
+    """Exploitable L1 SSRF findings — a server-side fetch reaching internal hosts."""
+    return [
+        f for f in state.findings.values()
+        if f.layer == 1 and f.exploitable
+        and ((f.evidence or {}).get("family") == "ssrf" or (f.owasp_ref == "A10:2021"))
+    ]
+
+
 def _l4_agent_compromise(state: "ArgusState") -> list["Finding"]:
     """Exploitable L4 findings proving an agent issues attacker-controlled actions."""
     kws = ("hijack", "confused deputy", "tool call", "tool-call", "compromis", "steers agent")

@@ -59,6 +59,36 @@ OAUTH_CHECKS = [
         "evidence": {"missing_control": "per-agent capability tokens", "risk": "Confused deputy enables privilege escalation"},
         "exploitable": True, "confidence": 0.86,
     },
+    {
+        "id": "ID-006",
+        "title": "Refresh token replay — long-lived refresh token not rotated on use",
+        "severity": "high",
+        "owasp_ref": "A07:2021",
+        "mitre_ref": "AML.T0012",
+        "cve_class": None,
+        "evidence": {"missing": "refresh-token rotation", "risk": "A stolen refresh token mints new access tokens indefinitely"},
+        "exploitable": True, "confidence": 0.83,
+    },
+    {
+        "id": "ID-007",
+        "title": "Session fixation — session identifier not regenerated after authentication",
+        "severity": "high",
+        "owasp_ref": "A07:2021",
+        "mitre_ref": "AML.T0012",
+        "cve_class": None,
+        "evidence": {"missing": "session ID regeneration on login", "risk": "Attacker-fixed session ID is elevated to the victim's authenticated session"},
+        "exploitable": True, "confidence": 0.8,
+    },
+    {
+        "id": "ID-008",
+        "title": "JWT algorithm confusion — server accepts 'alg: none' / HS256 with public key",
+        "severity": "critical",
+        "owasp_ref": "A02:2021",
+        "mitre_ref": "AML.T0012",
+        "cve_class": None,
+        "evidence": {"weakness": "unverified JWT alg header", "risk": "Attacker forges tokens by downgrading the signature algorithm"},
+        "exploitable": True, "confidence": 0.81,
+    },
 ]
 
 

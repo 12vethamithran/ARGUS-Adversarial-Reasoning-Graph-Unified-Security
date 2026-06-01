@@ -53,10 +53,50 @@ const REF_KB: Record<string, KbEntry> = {
     impact: "Known exploits can be run directly against the component, and malicious typosquats can execute code at install time.",
     remediation: "Upgrade to a patched version, pin and hash dependencies, and gate installs through an audited internal registry.",
   },
+  "A01:2021": {
+    description: "Broken access control — authorization is not enforced server-side, allowing force-browsing to privileged paths, IDOR (object references that aren't owner-checked), or open redirects.",
+    impact: "An attacker reaches admin functionality, reads or modifies other users' objects, or abuses a trusted redirect to phish or chain further attacks.",
+    remediation: "Deny by default, enforce per-object ownership checks server-side, validate redirect targets against an allow-list, and log access-control failures.",
+  },
+  "A03:2021": {
+    description: "Injection — untrusted input is interpreted as code or query syntax (SQL, OS command, server-side template, or reflected into HTML/JS as XSS).",
+    impact: "Database disclosure or modification, remote command/template execution, or script execution in victims' browsers — frequently a full-compromise primitive.",
+    remediation: "Use parameterized queries / safe APIs, contextually output-encode all reflected data, sandbox template engines, and validate input against strict allow-lists.",
+  },
+  "A04:2021": {
+    description: "Insecure design / insufficient error handling — verbose stack traces and debug output reveal internal structure, and security controls are missing by design.",
+    impact: "Leaked internals (paths, framework versions, queries) accelerate exploitation and indicate controls that were never designed in.",
+    remediation: "Threat-model during design, return generic error pages, disable debug in production, and add the missing control rather than patching symptoms.",
+  },
+  "A07:2021": {
+    description: "Identification and authentication failures — credentials or sessions are weakly protected (password fields over HTTP, session cookies lacking Secure/HttpOnly/SameSite).",
+    impact: "Session theft, credential interception, and account takeover without defeating any strong control.",
+    remediation: "Serve auth over TLS only, set Secure/HttpOnly/SameSite on session cookies, rotate session IDs on login, and add MFA.",
+  },
+  "A08:2021": {
+    description: "Software and data integrity failures — externally hosted scripts/resources are loaded without Subresource Integrity (SRI) or signature verification.",
+    impact: "A compromised CDN or third party can inject arbitrary code that runs with the app's full privileges.",
+    remediation: "Add SRI hashes to external script/link tags, pin and verify third-party assets, and prefer self-hosting critical resources.",
+  },
+  "A09:2021": {
+    description: "Security logging and monitoring failures — error/debug detail is exposed while meaningful security events likely go unlogged.",
+    impact: "Attacks proceed undetected and incident response is blinded; leaked traces also aid the attacker directly.",
+    remediation: "Suppress verbose errors to clients, log auth/access/input failures in a SIEM-consumable format, and alert on anomalies.",
+  },
+  "A10:2021": {
+    description: "Server-Side Request Forgery (SSRF) — the server fetches a user-supplied URL without validation, reaching internal hosts, cloud metadata, or file:// resources.",
+    impact: "Access to internal services and cloud metadata (credentials), or local file disclosure — a common pivot into the internal network.",
+    remediation: "Allow-list permitted schemes/hosts, block link-local and private ranges, and resolve+validate destinations before fetching.",
+  },
   "LLM01:2025": {
     description: "Prompt injection — untrusted input overrides the model's instructions, directly or via retrieved/embedded content.",
     impact: "The model can be steered to leak data, ignore guardrails, or invoke tools on the attacker's behalf.",
     remediation: "Separate system and user channels, constrain outputs to schemas, and treat all model output as untrusted before acting on it.",
+  },
+  "LLM02:2025": {
+    description: "Insecure output handling — model output is consumed downstream (rendered as HTML/JS, used in a shell, or as SQL) without treating it as untrusted.",
+    impact: "An injected response becomes stored/reflected XSS, command injection, or SQLi in the consuming system — the model is turned into an injection vector.",
+    remediation: "Encode/sanitize model output for its sink, never eval or shell-exec it, and apply the same output-encoding rules you would to any untrusted user input.",
   },
   "LLM06:2025": {
     description: "Excessive agency — the model is granted tools or permissions broader than its task requires.",
@@ -112,6 +152,41 @@ const REF_KB: Record<string, KbEntry> = {
     description: "Lateral movement — a reachable path exists from a web-facing host to a sensitive internal system.",
     impact: "An attacker who lands on the web tier can pivot directly to high-value internal assets.",
     remediation: "Enforce network segmentation and least-privilege service accounts; monitor and alert on cross-tier connections.",
+  },
+  "T1190": {
+    description: "Exploit public-facing application — a reachable web vulnerability (injection, broken access control, open redirect) is exercised against the entry tier.",
+    impact: "Initial access or data disclosure from the internet-facing surface, often the first hop of a kill chain.",
+    remediation: "Patch and harden the application, validate all input server-side, and place a WAF / rate limiting in front of exposed endpoints.",
+  },
+  "T1083": {
+    description: "File and directory discovery via path traversal / LFI — '../' sequences escape the intended directory to read arbitrary files.",
+    impact: "Disclosure of configuration, source, or credential files (e.g. /etc/passwd), enabling deeper compromise.",
+    remediation: "Canonicalize and confine file paths to a safe root, reject traversal sequences, and avoid passing user input to filesystem APIs.",
+  },
+  "T1221": {
+    description: "Template injection (SSTI) — user input is evaluated by a server-side template engine.",
+    impact: "Expression evaluation that frequently escalates to remote code execution on the server.",
+    remediation: "Never render user input as a template; use sandboxed/logic-less templates and pass data as bound variables only.",
+  },
+  "T1539": {
+    description: "Steal web session / access another user's object (IDOR) — predictable object references are not owner-checked.",
+    impact: "Horizontal/vertical privilege escalation: reading or modifying objects belonging to other users.",
+    remediation: "Enforce per-object authorization on every request and use unpredictable, server-mapped identifiers.",
+  },
+  "T1090": {
+    description: "Proxy / SSRF — the server is coerced into making requests to attacker-chosen internal destinations.",
+    impact: "Reaches internal-only services and cloud metadata endpoints, often yielding credentials or a network pivot.",
+    remediation: "Validate and allow-list outbound destinations, block metadata and private IP ranges, and isolate egress.",
+  },
+  "T1592": {
+    description: "Gather victim host information — version banners and verbose errors disclose components and internals.",
+    impact: "Fingerprinting that lets an attacker target known CVEs and tailor payloads.",
+    remediation: "Suppress version banners and stack traces, and return generic error responses.",
+  },
+  "T1195": {
+    description: "Supply-chain compromise — externally loaded code/resources lack integrity verification (missing SRI).",
+    impact: "A compromised third party can inject code that executes with the application's privileges.",
+    remediation: "Add Subresource Integrity hashes, verify signatures, and pin third-party dependencies.",
   },
   "AML.T0012": {
     description: "Valid credential / token abuse — a session token or credential is exposed (e.g. in a URL or plaintext).",

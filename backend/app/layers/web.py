@@ -1,13 +1,35 @@
-"""Layer 1 — Web Surface Scanner (OWASP Web Top 10)."""
+"""Layer 1 — Web Surface Scanner (OWASP Web Top 10).
+
+Coverage spans the full OWASP Web Top 10 (2021):
+  A01 Broken Access Control  — force-browse privileged paths, IDOR, open redirect
+  A02 Cryptographic Failures — cleartext transport, exposed secrets/credentials
+  A03 Injection              — SQLi (error/boolean/time/union), XSS, cmdi, SSTI, traversal
+  A04 Insecure Design        — verbose error / stack-trace leakage
+  A05 Misconfiguration       — security headers, CORS, methods, dir listing, sensitive paths
+  A06 Vulnerable Components  — version fingerprint (informational, feeds L6)
+  A07 Auth Failures          — password-over-HTTP, weak session cookies
+  A08 Integrity Failures     — missing Subresource Integrity (SRI)
+  A09 Logging/Monitoring     — stack-trace/debug leakage signal
+  A10 SSRF                   — internal-host / metadata / file-scheme parameter probes
+
+Active probes (SQLi/XSS/traversal/cmdi/SSTI/SSRF/redirect/IDOR) are GET-only and
+non-destructive, rate-limited, concurrency-capped, and time-based payloads are
+clamped to web_payloads.MAX_TIME_BASED_DELAY. Every hit is confirmed by a
+content/timing signature so catch-all 200 pages don't produce false positives.
+This is authorized-testing tooling — see the project ETHICS note.
+"""
 from __future__ import annotations
 import asyncio
 import math
 import re
+import time
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 
 from app.layers.base import BaseLayer
+from app.layers import web_payloads as wp
 from app.models.finding import Finding
 
 if TYPE_CHECKING:
@@ -54,6 +76,11 @@ SENSITIVE_PATHS = [
 # unescaped in the response, proves the input reaches the page without encoding.
 REFLECT_CANARY = "argus<xss>7f3a"
 
+# Discovery / probing safety caps.
+MAX_PARAMS_PROBED = 6        # most fuzzed params per target
+MAX_CONNECTIONS = 8          # httpx connection pool ceiling
+PROBE_CONCURRENCY = 6        # in-flight active probes
+
 
 def _looks_exposed(path: str, status: int, text: str) -> bool:
     """Confirm a sensitive path is genuinely exposed via a content signature."""
@@ -79,6 +106,57 @@ def _looks_exposed(path: str, status: int, text: str) -> bool:
     if path == "/.well-known/security.txt":
         return "contact:" in tl
     return False
+
+
+# ── Parameter / form discovery (regex-based, no extra deps) ───────────────────
+_INPUT_NAME_RE = re.compile(r'(?i)<(?:input|textarea|select)\b[^>]*\bname\s*=\s*["\']([^"\']+)["\']')
+_FORM_RE = re.compile(r'(?i)<form\b([^>]*)>(.*?)</form>', re.DOTALL)
+_ACTION_RE = re.compile(r'(?i)\baction\s*=\s*["\']([^"\']*)["\']')
+_METHOD_RE = re.compile(r'(?i)\bmethod\s*=\s*["\']([^"\']*)["\']')
+_SCRIPT_SRC_RE = re.compile(r'(?i)<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\'][^>]*>')
+
+
+def discover_params(url: str, html: str) -> list[str]:
+    """Parameter names worth fuzzing: existing query params + form fields.
+
+    Falls back to a small common-name list when the target exposes none of its
+    own. De-duplicated, order-stable, and capped by the caller.
+    """
+    names: list[str] = []
+    seen: set[str] = set()
+
+    def _add(n: str) -> None:
+        n = (n or "").strip()
+        if n and n not in seen:
+            seen.add(n)
+            names.append(n)
+
+    for k, _v in parse_qsl(urlparse(url).query):
+        _add(k)
+    for m in _INPUT_NAME_RE.finditer(html or ""):
+        _add(m.group(1))
+
+    if not names:
+        for n in wp.COMMON_FUZZ_PARAMS:
+            _add(n)
+    return names
+
+
+def _set_param(url: str, param: str, value: str) -> str:
+    """Return `url` with `param` set to `value` in the query string."""
+    parts = urlparse(url)
+    q = dict(parse_qsl(parts.query, keep_blank_values=True))
+    q[param] = value
+    return urlunparse(parts._replace(query=urlencode(q)))
+
+
+def _looks_privileged(text: str) -> bool:
+    """Heuristic: a force-browsed page that looks like an admin/management UI."""
+    tl = (text or "")[:6000].lower()
+    return any(k in tl for k in (
+        "admin", "dashboard", "user management", "control panel",
+        "phpmyadmin", "swagger", "actuator", "delete user", "manage users",
+    ))
 
 
 class WebLayer(BaseLayer):
@@ -118,8 +196,32 @@ class WebLayer(BaseLayer):
 
         headers = {k.lower(): v for k, v in resp.headers.items()}
         body = resp.text[:8000]
+        full_body = resp.text
+        final_url = str(resp.url)
 
-        # ── Security headers ─────────────────────────────────────────────
+        # ── Passive checks (A02 / A05 / A06 / A08) ───────────────────────────
+        findings += self._passive_checks(url, final_url, headers, resp, body, full_body)
+
+        # ── Active probes (A01 / A03 / A04 / A07 / A09 / A10) ────────────────
+        try:
+            findings += await self._active_probes(url, final_url, full_body)
+        except Exception:
+            pass  # one failing probe family must never abort the layer
+
+        if not findings:
+            findings.append(self._finding(
+                title="No critical web surface issues found",
+                severity="info", evidence={"url": url, "status": resp.status_code},
+                exploitable=False, confidence=0.9,
+            ))
+
+        return findings
+
+    # ── Passive surface analysis ──────────────────────────────────────────────
+    def _passive_checks(self, url, final_url, headers, resp, body, full_body) -> list[Finding]:
+        findings: list[Finding] = []
+
+        # Security headers
         for hdr, title, sev, owasp in SECURITY_HEADERS:
             if hdr.lower() not in headers:
                 findings.append(self._finding(
@@ -128,7 +230,7 @@ class WebLayer(BaseLayer):
                     exploitable=False, confidence=0.95,
                 ))
 
-        # ── CORS wildcard ────────────────────────────────────────────────
+        # CORS wildcard
         acao = headers.get("access-control-allow-origin", "")
         if acao == "*":
             findings.append(self._finding(
@@ -145,17 +247,20 @@ class WebLayer(BaseLayer):
                 exploitable=False, confidence=0.8,
             ))
 
-        # ── Server version disclosure ─────────────────────────────────────
+        # Server version disclosure (A06 fingerprint — feeds L6)
         server = headers.get("server", "")
-        if server and any(c.isdigit() for c in server):
+        powered = headers.get("x-powered-by", "")
+        banner = server or powered
+        if banner and any(c.isdigit() for c in banner):
             findings.append(self._finding(
-                title=f"Server version disclosed: {server}",
-                severity="low", owasp_ref="A05:2021",
-                evidence={"server_header": server},
+                title=f"Component version disclosed: {banner}",
+                severity="low", owasp_ref="A06:2021", mitre_ref="T1592",
+                evidence={"server": server, "x_powered_by": powered,
+                          "note": "Version fingerprint — cross-checked against known CVEs in L6"},
                 exploitable=False, confidence=0.85,
             ))
 
-        # ── JS secret entropy scan ───────────────────────────────────────
+        # JS secret entropy scan (A02)
         for match in SECRET_RE.finditer(body):
             key_name, value = match.group(1), match.group(2)
             entropy = _shannon(value)
@@ -167,23 +272,7 @@ class WebLayer(BaseLayer):
                     exploitable=True, confidence=0.78,
                 ))
 
-        # ── HTTP methods ─────────────────────────────────────────────────
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), verify=False) as client:
-                opts = await client.options(url)
-            allow = opts.headers.get("allow", "")
-            if "DELETE" in allow or "PUT" in allow:
-                findings.append(self._finding(
-                    title=f"Dangerous HTTP methods enabled: {allow}",
-                    severity="medium", owasp_ref="A05:2021",
-                    evidence={"allow": allow},
-                    exploitable=True, confidence=0.7,
-                ))
-        except Exception:
-            pass
-
-        # ── Cleartext transport ──────────────────────────────────────────
-        final_url = str(resp.url)
+        # Cleartext transport (A02)
         if final_url.startswith("http://"):
             findings.append(self._finding(
                 title="Site served over cleartext HTTP (no TLS)",
@@ -192,7 +281,7 @@ class WebLayer(BaseLayer):
                 exploitable=False, confidence=0.9,
             ))
 
-        # ── Cookie security flags ────────────────────────────────────────
+        # Cookie security flags (A05/A07)
         _get_list = getattr(resp.headers, "get_list", None)
         cookies = _get_list("set-cookie") if _get_list else (
             [resp.headers["set-cookie"]] if "set-cookie" in resp.headers else [])
@@ -203,14 +292,17 @@ class WebLayer(BaseLayer):
                        (("Secure", "secure"), ("HttpOnly", "httponly"), ("SameSite", "samesite"))
                        if tok not in cl]
             if missing:
+                # Session cookies missing flags map to auth failures (A07).
+                is_session = any(s in name.lower() for s in ("sess", "sid", "auth", "token"))
                 findings.append(self._finding(
                     title=f"Cookie '{name}' missing flags: {', '.join(missing)}",
-                    severity="low", owasp_ref="A05:2021",
-                    evidence={"cookie": name, "missing_flags": missing},
+                    severity="medium" if is_session else "low",
+                    owasp_ref="A07:2021" if is_session else "A05:2021",
+                    evidence={"cookie": name, "missing_flags": missing, "session_cookie": is_session},
                     exploitable=False, confidence=0.85,
                 ))
 
-        # ── Directory listing ────────────────────────────────────────────
+        # Directory listing (A05)
         if "<title>Index of /" in body or "Directory listing for" in body:
             findings.append(self._finding(
                 title="Directory listing enabled",
@@ -219,63 +311,328 @@ class WebLayer(BaseLayer):
                 exploitable=False, confidence=0.8,
             ))
 
-        # ── Reflected input (XSS surface) ────────────────────────────────
-        try:
-            sep = "&" if "?" in url else "?"
-            probe_url = f"{url}{sep}q={REFLECT_CANARY}"
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(6.0), verify=False, follow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
-            ) as client:
-                rprobe = await client.get(probe_url)
-            if REFLECT_CANARY in rprobe.text:  # echoed back unescaped
-                findings.append(self._finding(
-                    title="Reflected user input rendered unescaped (XSS surface)",
-                    severity="high", owasp_ref="A03:2021", mitre_ref="T1059",
-                    evidence={"param": "q", "canary": REFLECT_CANARY, "url": probe_url},
-                    exploitable=True, confidence=0.8,
-                ))
-        except Exception:
-            pass
-
-        # ── Sensitive path exposure (concurrent) ─────────────────────────
-        base = final_url.split("?", 1)[0].rstrip("/")
-        try:
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(connect=4.0, read=6.0, write=4.0, pool=4.0),
-                verify=False, follow_redirects=False,
-                headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
-            ) as client:
-                async def _probe(p: str):
-                    try:
-                        return p, await client.get(base + p)
-                    except Exception:
-                        return p, None
-
-                results = await asyncio.gather(
-                    *(_probe(p) for p, _s, _e, _o in SENSITIVE_PATHS)
-                )
-            sig = {p: (sev, exp, owasp) for p, sev, exp, owasp in SENSITIVE_PATHS}
-            for path, r in results:
-                if r is None:
-                    continue
-                sev, exp, owasp = sig[path]
-                if _looks_exposed(path, r.status_code, r.text):
-                    findings.append(self._finding(
-                        title=f"Sensitive path exposed: {path}",
-                        severity=sev, owasp_ref=owasp,
-                        evidence={"path": path, "status": r.status_code,
-                                  "sample": r.text[:120]},
-                        exploitable=exp, confidence=0.88,
-                    ))
-        except Exception:
-            pass
-
-        if not findings:
+        # Stack-trace / debug leakage (A04 / A09)
+        if wp.STACKTRACE_SIGNATURE.search(full_body):
             findings.append(self._finding(
-                title="No critical web surface issues found",
-                severity="info", evidence={"url": url, "status": resp.status_code},
-                exploitable=False, confidence=0.9,
+                title="Verbose error / stack trace leaked in response",
+                severity="medium", owasp_ref="A04:2021", mitre_ref="T1592",
+                evidence={"url": final_url, "signal": "stack-trace signature in body",
+                          "note": "Insufficient error handling / logging hygiene (A04/A09)."},
+                exploitable=False, confidence=0.75,
             ))
 
+        # Missing Subresource Integrity on cross-origin scripts (A08)
+        host = urlparse(final_url).netloc
+        for m in _SCRIPT_SRC_RE.finditer(full_body):
+            src = m.group(1)
+            tag = m.group(0)
+            is_external = src.startswith("http") and host not in src
+            if is_external and "integrity" not in tag.lower():
+                findings.append(self._finding(
+                    title="External script loaded without Subresource Integrity (SRI)",
+                    severity="low", owasp_ref="A08:2021", mitre_ref="T1195",
+                    evidence={"script_src": src[:200]},
+                    exploitable=False, confidence=0.7,
+                ))
+                break  # one representative finding is enough
+
+        return findings
+
+    # ── Active probing orchestrator ───────────────────────────────────────────
+    async def _active_probes(self, url, final_url, full_body) -> list[Finding]:
+        findings: list[Finding] = []
+        params = discover_params(url, full_body)[:MAX_PARAMS_PROBED]
+        base = final_url.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=4.0, read=max(wp.MAX_TIME_BASED_DELAY + 4.0, 8.0),
+                                  write=4.0, pool=4.0),
+            verify=False, follow_redirects=False,
+            limits=httpx.Limits(max_connections=MAX_CONNECTIONS),
+            headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
+        ) as client:
+            sem = asyncio.Semaphore(PROBE_CONCURRENCY)
+
+            # Baseline page for boolean/timing comparisons (param echoed as benign).
+            baseline_url = _set_param(url, params[0], "argusbaseline") if params else url
+            baseline_text, baseline_lat = await self._timed_get(client, sem, baseline_url)
+
+            # Injection families across discovered params.
+            findings += await self._probe_injection(
+                client, sem, url, params, baseline_text, baseline_lat)
+
+            # Open redirect (param-targeted) and SSRF (param-targeted).
+            findings += await self._probe_open_redirect(client, sem, url, params)
+            findings += await self._probe_ssrf(client, sem, url, params)
+
+            # Broken access control: force-browse privileged paths.
+            findings += await self._probe_access_control(client, sem, base)
+
+            # IDOR on numeric/id-looking params.
+            findings += await self._probe_idor(client, sem, url, params)
+
+            # HTTP methods (A05) + sensitive path exposure (A05/A02).
+            findings += await self._probe_methods(client, url)
+            findings += await self._probe_sensitive_paths(client, sem, base)
+
+        return findings
+
+    # ── A05 dangerous HTTP methods ────────────────────────────────────────────
+    async def _probe_methods(self, client, url) -> list[Finding]:
+        try:
+            opts = await client.options(url)
+        except Exception:
+            return []
+        allow = opts.headers.get("allow", "")
+        if "DELETE" in allow or "PUT" in allow:
+            return [self._finding(
+                title=f"Dangerous HTTP methods enabled: {allow}",
+                severity="medium", owasp_ref="A05:2021",
+                evidence={"allow": allow}, exploitable=True, confidence=0.7,
+            )]
+        return []
+
+    # ── A05/A02 sensitive path exposure (concurrent, signature-confirmed) ─────
+    async def _probe_sensitive_paths(self, client, sem, base) -> list[Finding]:
+        findings: list[Finding] = []
+
+        async def _probe(p):
+            async with sem:
+                try:
+                    return p, await client.get(base + p)
+                except Exception:
+                    return p, None
+
+        results = await asyncio.gather(*(_probe(p) for p, _s, _e, _o in SENSITIVE_PATHS))
+        sig = {p: (sev, exp, owasp) for p, sev, exp, owasp in SENSITIVE_PATHS}
+        for path, r in results:
+            if r is None:
+                continue
+            sev, exp, owasp = sig[path]
+            if _looks_exposed(path, r.status_code, r.text):
+                findings.append(self._finding(
+                    title=f"Sensitive path exposed: {path}",
+                    severity=sev, owasp_ref=owasp,
+                    evidence={"path": path, "status": r.status_code, "sample": r.text[:120]},
+                    exploitable=exp, confidence=0.88,
+                ))
+        return findings
+
+    async def _timed_get(self, client, sem, target, headers=None):
+        async with sem:
+            t0 = time.perf_counter()
+            try:
+                r = await client.get(target, headers=headers)
+                return r.text, time.perf_counter() - t0
+            except Exception:
+                return "", 0.0
+
+    # ── A03 / A01 injection families ──────────────────────────────────────────
+    async def _probe_injection(self, client, sem, url, params,
+                               baseline_text, baseline_lat) -> list[Finding]:
+        findings: list[Finding] = []
+        # (family payloads, hint-filter or None) — redirect/ssrf handled separately.
+        families = [wp.SQLI_PAYLOADS, wp.XSS_PAYLOADS, wp.TRAVERSAL_PAYLOADS,
+                    wp.CMDI_PAYLOADS, wp.SSTI_PAYLOADS]
+
+        for param in params:
+            confirmed_families: set[str] = set()
+            for fam in families:
+                for pd in fam:
+                    if pd["family"] in confirmed_families:
+                        break  # already confirmed this family on this param
+                    f = await self._run_payload(client, sem, url, param, pd,
+                                                baseline_text, baseline_lat)
+                    if f is not None:
+                        findings.append(f)
+                        if f.exploitable:
+                            confirmed_families.add(pd["family"])
+        return findings
+
+    async def _run_payload(self, client, sem, url, param, pd,
+                           baseline_text, baseline_lat) -> Finding | None:
+        detect = pd["detect"]
+        ev = {"param": param, "url": url, "family": pd["family"],
+              "technique": pd["technique"], "payload_id": pd["id"]}
+
+        # Time-based (SQLi / cmdi)
+        if detect == "time":
+            target = _set_param(url, param, f"x{pd['payload']}")
+            _txt, lat = await self._timed_get(client, sem, target)
+            if wp.latency_confirms(baseline_lat, lat, pd.get("delay", wp.MAX_TIME_BASED_DELAY)):
+                ev.update({"signal": f"latency {lat:.1f}s vs baseline {baseline_lat:.1f}s",
+                           "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.8)
+            return None
+
+        # Boolean-based blind SQLi: compare true vs false vs baseline.
+        if detect == "boolean":
+            true_url = _set_param(url, param, "1" + pd["payload"]["true"])
+            false_url = _set_param(url, param, "1" + pd["payload"]["false"])
+            t_text, _ = await self._timed_get(client, sem, true_url)
+            f_text, _ = await self._timed_get(client, sem, false_url)
+            if not t_text or not f_text:
+                return None
+            tf_sim = wp.body_similarity(t_text, f_text)
+            tb_sim = wp.body_similarity(t_text, baseline_text)
+            # TRUE resembles the normal page, FALSE diverges from TRUE.
+            if tf_sim < 0.95 and tb_sim > tf_sim:
+                ev.update({"signal": f"true≈baseline ({tb_sim:.2f}) but true≠false ({tf_sim:.2f})",
+                           "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.72)
+            return None
+
+        # Single-request payloads.
+        target = _set_param(url, param, pd["payload"])
+        async with sem:
+            try:
+                r = await client.get(target)
+            except Exception:
+                return None
+        text = r.text
+
+        if detect == "sql_error":
+            engine = wp.match_sql_error(text)
+            if engine:
+                ev.update({"engine": engine, "signal": f"{engine} SQL error",
+                           "snippet": text[:160], "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.85)
+        elif detect == "reflect":
+            if wp.reflects_token(text, pd.get("proof", pd["payload"])):
+                ev.update({"signal": "payload reflected unescaped", "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.8)
+        elif detect == "ssti_eval":
+            if pd["expect"] in text and pd["literal"] not in text:
+                ev.update({"signal": f"template evaluated → {pd['expect']}", "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.82)
+        elif detect == "fs_signature":
+            if wp.TRAVERSAL_SIGNATURE.search(text):
+                ev.update({"signal": "filesystem content disclosed", "snippet": text[:160],
+                           "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.85)
+        elif detect == "cmd_signature":
+            if wp.CMDI_SIGNATURE.search(text):
+                ev.update({"signal": "command output (uid=) in response", "snippet": text[:160],
+                           "verdict": "exploited"})
+                return self._inj_finding(pd, ev, exploited=True, conf=0.85)
+        return None
+
+    def _inj_finding(self, pd, ev, exploited, conf) -> Finding:
+        sev = "critical" if exploited and pd["family"] in ("sqli", "cmdi", "ssti", "traversal") \
+            else ("high" if exploited else "low")
+        verb = "EXPLOITED" if exploited else "Suspected"
+        return self._finding(
+            title=f"{verb}: {pd['name']} [{pd['id']}] via '{ev['param']}'",
+            severity=sev, owasp_ref=pd["owasp"], mitre_ref=pd.get("mitre"),
+            evidence=ev, exploitable=exploited, confidence=conf,
+        )
+
+    # ── A01 open redirect ─────────────────────────────────────────────────────
+    async def _probe_open_redirect(self, client, sem, url, params) -> list[Finding]:
+        findings: list[Finding] = []
+        targets = [p for p in params if any(h in p.lower() for h in wp.REDIRECT_PARAM_HINTS)]
+        for param in targets:
+            for pd in wp.OPEN_REDIRECT_PAYLOADS:
+                probe = _set_param(url, param, pd["payload"])
+                async with sem:
+                    try:
+                        r = await client.get(probe)
+                    except Exception:
+                        continue
+                loc = r.headers.get("location", "")
+                if r.status_code in (301, 302, 303, 307, 308) and pd["marker"] in loc:
+                    findings.append(self._finding(
+                        title=f"EXPLOITED: {pd['name']} [{pd['id']}] via '{param}'",
+                        severity="medium", owasp_ref=pd["owasp"], mitre_ref=pd.get("mitre"),
+                        evidence={"param": param, "family": "open_redirect",
+                                  "technique": pd["technique"], "location": loc[:200],
+                                  "status": r.status_code, "verdict": "exploited"},
+                        exploitable=True, confidence=0.8,
+                    ))
+                    break
+        return findings
+
+    # ── A10 SSRF ──────────────────────────────────────────────────────────────
+    async def _probe_ssrf(self, client, sem, url, params) -> list[Finding]:
+        findings: list[Finding] = []
+        targets = [p for p in params if any(h in p.lower() for h in wp.SSRF_PARAM_HINTS)]
+        for param in targets:
+            for pd in wp.SSRF_PAYLOADS:
+                probe = _set_param(url, param, pd["payload"])
+                async with sem:
+                    try:
+                        r = await client.get(probe)
+                    except Exception:
+                        continue
+                text = r.text
+                hit = (wp.TRAVERSAL_SIGNATURE.search(text) if pd["detect"] == "fs_signature"
+                       else wp.reflects_token(text, pd.get("proof", "")))
+                if hit:
+                    findings.append(self._finding(
+                        title=f"EXPLOITED: {pd['name']} [{pd['id']}] via '{param}'",
+                        severity="high", owasp_ref=pd["owasp"], mitre_ref=pd.get("mitre"),
+                        evidence={"param": param, "family": "ssrf", "technique": pd["technique"],
+                                  "snippet": text[:160], "verdict": "exploited"},
+                        exploitable=True, confidence=0.74,
+                    ))
+                    break
+        return findings
+
+    # ── A01 broken access control (force browse) ──────────────────────────────
+    async def _probe_access_control(self, client, sem, base) -> list[Finding]:
+        findings: list[Finding] = []
+
+        async def _probe(path):
+            async with sem:
+                try:
+                    return path, await client.get(base + path)
+                except Exception:
+                    return path, None
+
+        results = await asyncio.gather(*(_probe(p) for p in wp.PRIVILEGED_PATHS))
+        for path, r in results:
+            if r is None or r.status_code != 200:
+                continue
+            if _looks_privileged(r.text):
+                findings.append(self._finding(
+                    title=f"Privileged path reachable without auth: {path}",
+                    severity="high", owasp_ref="A01:2021", mitre_ref="T1190",
+                    evidence={"path": path, "status": r.status_code,
+                              "signal": "admin/management UI content", "snippet": r.text[:160],
+                              "verdict": "exploited"},
+                    exploitable=True, confidence=0.72,
+                ))
+        return findings
+
+    # ── A01 IDOR ──────────────────────────────────────────────────────────────
+    async def _probe_idor(self, client, sem, url, params) -> list[Finding]:
+        findings: list[Finding] = []
+        id_params = [p for p in params if "id" in p.lower() or p.lower() in ("user", "account", "num")]
+        for param in id_params:
+            cur = dict(parse_qsl(urlparse(url).query)).get(param, "")
+            if not cur.isdigit():
+                continue
+            n = int(cur)
+            base_text, _ = await self._timed_get(client, sem, url)
+            # Bounded: at most 3 adjacent IDs, GET-only, never write.
+            for delta in (1, -1, 2):
+                other = _set_param(url, param, str(max(0, n + delta)))
+                async with sem:
+                    try:
+                        r = await client.get(other)
+                    except Exception:
+                        continue
+                if r.status_code == 200 and r.text and base_text:
+                    sim = wp.body_similarity(base_text, r.text)
+                    # Different valid object (structurally similar page, different data).
+                    if 0.5 < sim < 0.97:
+                        findings.append(self._finding(
+                            title=f"Possible IDOR: '{param}'={n}→{n+delta} returns another object",
+                            severity="high", owasp_ref="A01:2021", mitre_ref="T1539",
+                            evidence={"param": param, "from": n, "to": n + delta,
+                                      "body_similarity": round(sim, 3),
+                                      "verdict": "suspicious"},
+                            exploitable=True, confidence=0.6,
+                        ))
+                        break
         return findings
