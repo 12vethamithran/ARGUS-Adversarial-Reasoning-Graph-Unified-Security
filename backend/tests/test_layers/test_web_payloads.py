@@ -58,7 +58,9 @@ def test_latency_confirms():
 
 def test_ssti_payloads_have_expect_and_literal():
     for pd in wp.SSTI_PAYLOADS:
-        assert pd["expect"] == "49"
+        # Wrapped marker so a stray "49" on the page can't false-positive.
+        assert pd["expect"] == "arg49us"
+        assert "49" not in pd["literal"]          # literal must not contain the result
         assert pd["literal"] == pd["payload"]
         assert pd["detect"] == "ssti_eval"
 
