@@ -26,7 +26,7 @@ export const LAYER_META: Record<number, LayerMeta> = {
        description: "Tool-calling and agent autonomy risks — confused-deputy, tool-call hijacking, excessive agency, and unsafe MCP server exposure." },
   5: { id: 5, name: "Network Recon", short: "Network", domain: "Infrastructure", standard: "MITRE ATT&CK T1046",
        description: "Internal topology mapping, reachable sensitive services, lateral-movement paths, and network-exposed inference endpoints." },
-  6: { id: 6, name: "Supply Chain", short: "Supply", domain: "Infrastructure", standard: "OWASP A06:2021 / SkillJect",
+  6: { id: 6, name: "Supply Chain", short: "Supply", domain: "Infrastructure", standard: "OWASP A03:2025 / SkillJect",
        description: "Dependency and skill provenance — known-vulnerable packages, typosquats, and unvetted agent skill/plugin installation." },
   7: { id: 7, name: "Multi-Agent Propagation", short: "M-Agent", domain: "AI/LLM", standard: "MASpi",
        description: "Prompt-infection spread across an agent mesh — orchestrator compromise, trust-boundary failures, and worm-like propagation." },
@@ -38,55 +38,56 @@ interface KbEntry { description: string; impact: string; remediation: string; }
 
 // Keyed by OWASP / MITRE reference.
 const REF_KB: Record<string, KbEntry> = {
-  "A02:2021": {
-    description: "Cryptographic failure or secret exposure — sensitive material (keys, tokens, credentials) is disclosed or weakly protected.",
-    impact: "An attacker who recovers the secret can impersonate the service, decrypt traffic, or pivot into connected systems.",
-    remediation: "Rotate the exposed secret immediately, remove it from client-reachable responses, and store credentials in a managed secrets vault.",
+  // ── OWASP Web Top 10 (2025) ──────────────────────────────────────────────
+  "A01:2025": {
+    description: "Broken access control — authorization is not enforced server-side: force-browsing to privileged paths, IDOR, path traversal, CSRF, and SSRF (folded into this category in 2025).",
+    impact: "An attacker reaches admin functionality, reads/modifies other users' objects, forges state-changing requests, or coerces the server into requests to internal hosts and cloud metadata.",
+    remediation: "Deny by default and enforce per-object ownership checks server-side; use anti-CSRF tokens + SameSite; allow-list redirect/SSRF destinations and block private/link-local ranges.",
   },
-  "A05:2021": {
-    description: "Security misconfiguration — a hardening control (security header, CORS policy, HTTP method restriction) is missing or permissive.",
-    impact: "Weakens defense-in-depth, enabling clickjacking, cross-origin data theft, MIME sniffing, or downgrade attacks.",
-    remediation: "Apply the missing header / restrictive policy at the edge (reverse proxy or framework middleware) and re-scan to confirm.",
+  "A02:2025": {
+    description: "Security misconfiguration — a hardening control (security header, CORS policy, HTTP method restriction) is missing or permissive, or a sensitive path/dotfile is exposed.",
+    impact: "Weakens defense-in-depth, enabling clickjacking, cross-origin data theft, MIME sniffing, downgrade attacks, or disclosure of config/secret files.",
+    remediation: "Apply a hardened baseline at the edge (CSP, HSTS, restrictive CORS), disable unneeded methods, and block access to dotfiles/admin endpoints.",
   },
-  "A06:2021": {
-    description: "Vulnerable or outdated component — a dependency with a known CVE (or a typosquatted package) is in use.",
-    impact: "Known exploits can be run directly against the component, and malicious typosquats can execute code at install time.",
-    remediation: "Upgrade to a patched version, pin and hash dependencies, and gate installs through an audited internal registry.",
+  "A03:2025": {
+    description: "Software supply chain failures — vulnerable/outdated or compromised components, typosquatted packages, unsigned dependencies, or unvetted skills/plugins (expands the 2021 'Vulnerable & Outdated Components').",
+    impact: "Known exploits run directly against the component, and malicious/typosquatted packages can execute code at install or runtime.",
+    remediation: "Maintain an SBOM, pin and hash dependencies, scan continuously (pip-audit/npm audit), and gate installs through an audited registry with signed artifacts.",
   },
-  "A01:2021": {
-    description: "Broken access control — authorization is not enforced server-side, allowing force-browsing to privileged paths, IDOR (object references that aren't owner-checked), or open redirects.",
-    impact: "An attacker reaches admin functionality, reads or modifies other users' objects, or abuses a trusted redirect to phish or chain further attacks.",
-    remediation: "Deny by default, enforce per-object ownership checks server-side, validate redirect targets against an allow-list, and log access-control failures.",
+  "A04:2025": {
+    description: "Cryptographic failures — sensitive material (keys, tokens, credentials) is disclosed or weakly protected, including cleartext transport.",
+    impact: "An attacker who recovers the secret or intercepts cleartext traffic can impersonate the service, decrypt data, or pivot into connected systems.",
+    remediation: "Enforce TLS 1.2+ with HSTS, remove secrets from client-reachable responses, store credentials in a managed vault, and use strong current algorithms.",
   },
-  "A03:2021": {
-    description: "Injection — untrusted input is interpreted as code or query syntax (SQL, OS command, server-side template, or reflected into HTML/JS as XSS).",
+  "A05:2025": {
+    description: "Injection — untrusted input is interpreted as code or query syntax (SQL, NoSQL, OS command, server-side template, or reflected into HTML/JS as XSS).",
     impact: "Database disclosure or modification, remote command/template execution, or script execution in victims' browsers — frequently a full-compromise primitive.",
     remediation: "Use parameterized queries / safe APIs, contextually output-encode all reflected data, sandbox template engines, and validate input against strict allow-lists.",
   },
-  "A04:2021": {
-    description: "Insecure design / insufficient error handling — verbose stack traces and debug output reveal internal structure, and security controls are missing by design.",
-    impact: "Leaked internals (paths, framework versions, queries) accelerate exploitation and indicate controls that were never designed in.",
-    remediation: "Threat-model during design, return generic error pages, disable debug in production, and add the missing control rather than patching symptoms.",
+  "A06:2025": {
+    description: "Insecure design — missing or ineffective security controls at the design level rather than an implementation bug.",
+    impact: "Whole classes of attack remain possible because the control was never designed in.",
+    remediation: "Threat-model during design, use secure reference architectures, and add the missing control by design.",
   },
-  "A07:2021": {
-    description: "Identification and authentication failures — credentials or sessions are weakly protected (password fields over HTTP, session cookies lacking Secure/HttpOnly/SameSite).",
+  "A07:2025": {
+    description: "Authentication failures — credentials or sessions are weakly protected (password fields over HTTP, session cookies lacking Secure/HttpOnly/SameSite, fixation, missing MFA).",
     impact: "Session theft, credential interception, and account takeover without defeating any strong control.",
-    remediation: "Serve auth over TLS only, set Secure/HttpOnly/SameSite on session cookies, rotate session IDs on login, and add MFA.",
+    remediation: "Serve auth over TLS only, set Secure/HttpOnly/SameSite, regenerate session IDs on login, enforce TTLs, and add MFA.",
   },
-  "A08:2021": {
-    description: "Software and data integrity failures — externally hosted scripts/resources are loaded without Subresource Integrity (SRI) or signature verification.",
+  "A08:2025": {
+    description: "Software or data integrity failures — code/data consumed without integrity verification: missing Subresource Integrity (SRI), insecure deserialization, unsigned updates.",
     impact: "A compromised CDN or third party can inject arbitrary code that runs with the app's full privileges.",
-    remediation: "Add SRI hashes to external script/link tags, pin and verify third-party assets, and prefer self-hosting critical resources.",
+    remediation: "Add SRI hashes to external resources, verify signatures, secure CI/CD, and pin third-party assets.",
   },
-  "A09:2021": {
-    description: "Security logging and monitoring failures — error/debug detail is exposed while meaningful security events likely go unlogged.",
+  "A09:2025": {
+    description: "Security logging and alerting failures — insufficient logging/alerting lets attacks go undetected; verbose errors also leak internals.",
     impact: "Attacks proceed undetected and incident response is blinded; leaked traces also aid the attacker directly.",
-    remediation: "Suppress verbose errors to clients, log auth/access/input failures in a SIEM-consumable format, and alert on anomalies.",
+    remediation: "Log auth/access/input-validation failures in a SIEM-consumable format, suppress verbose errors to clients, and alert on anomalies.",
   },
-  "A10:2021": {
-    description: "Server-Side Request Forgery (SSRF) — the server fetches a user-supplied URL without validation, reaching internal hosts, cloud metadata, or file:// resources.",
-    impact: "Access to internal services and cloud metadata (credentials), or local file disclosure — a common pivot into the internal network.",
-    remediation: "Allow-list permitted schemes/hosts, block link-local and private ranges, and resolve+validate destinations before fetching.",
+  "A10:2025": {
+    description: "Mishandling of exceptional conditions (new in 2025) — uncaught exceptions, leaked stack traces, fail-open logic, or debug modes left enabled.",
+    impact: "Leaked internals (paths, framework versions, queries) accelerate exploitation, and fail-open error paths can bypass security checks.",
+    remediation: "Fail closed, return generic error pages, disable debug in production, and explicitly handle and test exceptional paths.",
   },
   "LLM01:2025": {
     description: "Prompt injection — untrusted input overrides the model's instructions, directly or via retrieved/embedded content.",

@@ -34,7 +34,8 @@ _LAYER_DEPS: dict[int, list[int]] = {
     8: [4],   # Identity only if MCP found something
 }
 
-LAYER_TIMEOUT = 12.0  # seconds per layer
+LAYER_TIMEOUT = 45.0  # seconds per layer — L1 runs a real, active web scan
+                      # (parallel, bounded probes) and legitimately needs > 12s.
 
 
 def _import_layer(layer_id: int):

@@ -96,7 +96,7 @@ async def test_reflected_xss_detected():
 
     xss = [f for f in results if f.evidence.get("family") == "xss" and f.exploitable]
     assert xss, "expected a reflected-XSS finding"
-    assert xss[0].layer == 1 and xss[0].owasp_ref == "A03:2021"
+    assert xss[0].layer == 1 and xss[0].owasp_ref == "A05:2025"
 
 
 @pytest.mark.asyncio
@@ -120,4 +120,4 @@ async def test_sqli_error_based_detected():
 
     sqli = [f for f in results if f.evidence.get("family") == "sqli" and f.exploitable]
     assert sqli, "expected an error-based SQLi finding"
-    assert sqli[0].severity == "critical" and sqli[0].owasp_ref == "A03:2021"
+    assert sqli[0].severity == "critical" and sqli[0].owasp_ref == "A05:2025"

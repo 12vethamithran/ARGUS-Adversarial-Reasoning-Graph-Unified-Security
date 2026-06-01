@@ -16,7 +16,7 @@ from app.models.finding import Finding
 def _sqli_finding() -> Finding:
     return Finding(
         layer=1, title="EXPLOITED: Single-quote error probe [SQLI-E1] via 'id'",
-        severity="critical", owasp_ref="A03:2021", mitre_ref="T1190",
+        severity="critical", owasp_ref="A05:2025", mitre_ref="T1190",
         exploitable=True, confidence=0.85,
         evidence={"param": "id", "url": "http://shop.example/item?id=1",
                   "family": "sqli", "technique": "error-based", "payload_id": "SQLI-E1"},
@@ -65,7 +65,7 @@ async def test_chain_includes_l1_attack_and_bridge():
     assert sqli.id in primary.steps and bridge.id in primary.steps
     # Remediations cite the real OWASP refs of the chained attacks.
     refs = {r.ref for r in primary.remediations}
-    assert "A03:2021" in refs and "LLM01:2025" in refs
+    assert "A05:2025" in refs and "LLM01:2025" in refs
 
     # Graph wires the chain steps as edges.
     G = build_graph(findings, chains)

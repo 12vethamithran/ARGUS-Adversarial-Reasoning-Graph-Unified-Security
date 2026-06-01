@@ -78,7 +78,7 @@ class SupplyChainLayer(BaseLayer):
             findings.append(self._finding(
                 title=f"Likely vulnerable dependency: {pkg['package']}=={pkg['version']} ({pkg['cve']})",
                 severity=pkg["severity"],
-                owasp_ref="A06:2021",
+                owasp_ref="A03:2025",
                 mitre_ref="AML.T0019",
                 evidence={**pkg, "note": "Heuristic — confirm with a real SBOM / pip-audit"},
                 exploitable=True, confidence=jitter(target, f"l6-cve-{pkg['cve']}-conf", 0.8, 0.12),
@@ -97,7 +97,7 @@ class SupplyChainLayer(BaseLayer):
             findings.append(self._finding(
                 title=f"Typosquat candidates detected: {len(suspicious)} packages near AI dependency names",
                 severity="high",
-                owasp_ref="A06:2021",
+                owasp_ref="A03:2025",
                 mitre_ref="AML.T0019",
                 evidence={"candidates": suspicious[:5], "method": "Levenshtein distance <= 3"},
                 exploitable=True, confidence=jitter(target, "l6-typosquat-conf", 0.74, 0.1),
@@ -124,7 +124,7 @@ class SupplyChainLayer(BaseLayer):
         if not findings:
             findings.append(self._finding(
                 title="No high-confidence supply-chain issues surfaced for this target",
-                severity="info", owasp_ref="A06:2021",
+                severity="info", owasp_ref="A03:2025",
                 evidence={"note": "Heuristic scan — run pip-audit against a real SBOM to confirm"},
                 exploitable=False, confidence=0.6,
             ))
@@ -143,7 +143,7 @@ class SupplyChainLayer(BaseLayer):
                 for rec in match_vulns(ecosystem, name, version):
                     findings.append(self._finding(
                         title=f"Vulnerable dependency: {name}=={version} ({rec['cve']})",
-                        severity=rec["severity"], owasp_ref="A06:2021", mitre_ref="AML.T0019",
+                        severity=rec["severity"], owasp_ref="A03:2025", mitre_ref="AML.T0019",
                         evidence={"package": name, "version": version, "cve": rec["cve"],
                                   "description": rec["desc"], "ecosystem": ecosystem,
                                   "source": "ARGUS bundled vuln KB"},
@@ -159,7 +159,7 @@ class SupplyChainLayer(BaseLayer):
                     if 1 <= d <= 2:
                         findings.append(self._finding(
                             title=f"Possible typosquatted dependency: '{name}' ~ '{legit}'",
-                            severity="high", owasp_ref="A06:2021", mitre_ref="AML.T0019",
+                            severity="high", owasp_ref="A03:2025", mitre_ref="AML.T0019",
                             evidence={"declared": name, "looks_like": legit, "edit_distance": d,
                                       "ecosystem": ecosystem},
                             exploitable=True, confidence=0.8,
@@ -169,7 +169,7 @@ class SupplyChainLayer(BaseLayer):
         if not findings:
             findings.append(self._finding(
                 title=f"No known-vulnerable dependencies found in {ecosystem} manifest ({len(deps)} deps scanned)",
-                severity="info", owasp_ref="A06:2021",
+                severity="info", owasp_ref="A03:2025",
                 evidence={"ecosystem": ecosystem, "deps_scanned": len(deps),
                           "source": "ARGUS bundled vuln KB"},
                 exploitable=False, confidence=0.9,

@@ -1,84 +1,85 @@
 ---
-# OWASP Web Application Security Top 10 — 2021
-# Used by L1 WebLayer for finding classification and remediation lookup
-version: "2021"
+# OWASP Web Application Security Top 10 — 2025
+# Used by L1 WebLayer for finding classification and remediation lookup.
+# Notable 2025 changes vs 2021: Software Supply Chain Failures (A03) expands the
+# old "Vulnerable & Outdated Components"; SSRF is folded into Broken Access
+# Control (A01); a new "Mishandling of Exceptional Conditions" (A10) is added.
+version: "2025"
 source: "https://owasp.org/Top10/"
 
 categories:
-  - id: "A01:2021"
+  - id: "A01:2025"
     name: "Broken Access Control"
-    description: "Restrictions on authenticated users are not enforced."
+    description: "Authorization not enforced server-side — IDOR, forced browsing, path traversal, CSRF, and SSRF (merged here in 2025)."
     remediations:
-      - "Implement least privilege and deny by default."
-      - "Enforce access controls server-side, not just UI."
-      - "Log access control failures and alert on repeated failures."
+      - "Deny by default; enforce per-object ownership checks on every request."
+      - "Validate redirect/SSRF destinations against an allow-list; block private/link-local ranges."
+      - "Use anti-CSRF tokens and SameSite cookies for state-changing requests."
 
-  - id: "A02:2021"
-    name: "Cryptographic Failures"
-    description: "Data exposed in transit or at rest due to weak/absent encryption."
-    remediations:
-      - "Classify sensitive data; apply encryption at rest and in transit."
-      - "Use strong, up-to-date cryptographic algorithms (TLS 1.2+)."
-      - "Never store passwords in cleartext; use bcrypt/argon2."
-
-  - id: "A03:2021"
-    name: "Injection"
-    description: "SQL, OS, LDAP, and other injection attacks."
-    remediations:
-      - "Use parameterized queries and ORMs."
-      - "Validate, filter, and sanitize all user-supplied data."
-      - "Use LIMIT and other SQL controls to prevent mass disclosure."
-
-  - id: "A04:2021"
-    name: "Insecure Design"
-    description: "Missing or ineffective security controls in the design phase."
-    remediations:
-      - "Use threat modeling during design."
-      - "Implement secure design patterns and reference architectures."
-
-  - id: "A05:2021"
+  - id: "A02:2025"
     name: "Security Misconfiguration"
-    description: "Insecure default configurations, open cloud storage, verbose error messages."
+    description: "Insecure defaults, missing security headers, permissive CORS, dangerous HTTP methods, exposed sensitive paths, directory listing."
     remediations:
-      - "Implement a secure configuration baseline and automated verification."
-      - "Remove or disable unnecessary features, components, and sample apps."
-      - "Set strict Content-Security-Policy and CORS headers."
+      - "Apply a hardened configuration baseline with automated verification."
+      - "Set strict CSP, HSTS, CORS, and disable unneeded methods/features."
+      - "Remove sample apps and block access to dotfiles and admin endpoints."
 
-  - id: "A06:2021"
-    name: "Vulnerable and Outdated Components"
-    description: "Using components with known vulnerabilities."
+  - id: "A03:2025"
+    name: "Software Supply Chain Failures"
+    description: "Vulnerable/outdated or compromised components, typosquats, unsigned dependencies, and unvetted skills/plugins entering build or runtime."
     remediations:
-      - "Maintain an inventory of all components and their versions."
-      - "Continuously monitor CVE databases and apply patches promptly."
-      - "Use pip-audit, npm audit, or Dependabot."
+      - "Maintain an SBOM; pin and hash dependencies; gate installs through an audited registry."
+      - "Continuously scan with pip-audit / npm audit and patch known CVEs promptly."
+      - "Require signed/reviewed third-party skills and components."
 
-  - id: "A07:2021"
-    name: "Identification and Authentication Failures"
-    description: "Weak authentication, credential exposure, session fixation."
+  - id: "A04:2025"
+    name: "Cryptographic Failures"
+    description: "Sensitive data exposed in transit or at rest — cleartext transport, leaked secrets/credentials, weak algorithms."
     remediations:
-      - "Implement MFA; avoid default credentials."
-      - "Invalidate sessions server-side on logout."
-      - "Use secure session management with HttpOnly, Secure, SameSite cookies."
+      - "Enforce TLS 1.2+ everywhere; redirect and HSTS-pin cleartext."
+      - "Remove secrets from client-reachable responses; store them in a managed vault."
+      - "Use strong, current algorithms; hash passwords with bcrypt/argon2."
 
-  - id: "A08:2021"
-    name: "Software and Data Integrity Failures"
-    description: "Code and infrastructure without integrity verification (e.g. insecure deserialization)."
+  - id: "A05:2025"
+    name: "Injection"
+    description: "SQL, NoSQL, OS command, server-side template, and cross-site scripting (XSS) injection from unvalidated input."
     remediations:
-      - "Use digital signatures to verify software/data integrity."
-      - "Ensure CI/CD pipelines are secured and audited."
+      - "Use parameterized queries / safe APIs; never concatenate untrusted input."
+      - "Contextually output-encode all reflected data; sandbox template engines."
+      - "Validate and filter input against strict allow-lists."
 
-  - id: "A09:2021"
-    name: "Security Logging and Monitoring Failures"
-    description: "Insufficient logging and monitoring allows attacks to go undetected."
+  - id: "A06:2025"
+    name: "Insecure Design"
+    description: "Missing or ineffective security controls at the design level."
     remediations:
-      - "Log all authentication, access control, and input validation failures."
-      - "Ensure logs are in a format consumable by SIEM tools."
-      - "Establish effective alerting and incident response processes."
+      - "Threat-model during design and use secure reference architectures."
+      - "Add the missing control by design rather than patching symptoms."
 
-  - id: "A10:2021"
-    name: "Server-Side Request Forgery (SSRF)"
-    description: "Server fetches remote resource without validating the user-supplied URL."
+  - id: "A07:2025"
+    name: "Authentication Failures"
+    description: "Weak authentication and session management — credentials over HTTP, weak session cookies, fixation, missing MFA."
     remediations:
-      - "Sanitize and validate all client-supplied input URLs."
-      - "Enforce network-level controls to deny requests to internal services."
-      - "Use allowlists for permitted URL schemes and destinations."
+      - "Serve auth over TLS; set Secure/HttpOnly/SameSite on session cookies."
+      - "Regenerate session IDs on login; enforce TTLs; add MFA."
+      - "Avoid default credentials and protect against user enumeration."
+
+  - id: "A08:2025"
+    name: "Software or Data Integrity Failures"
+    description: "Code/data consumed without integrity verification — missing Subresource Integrity (SRI), insecure deserialization, unsigned updates."
+    remediations:
+      - "Add SRI hashes to external resources; verify signatures."
+      - "Secure and audit CI/CD pipelines; pin third-party assets."
+
+  - id: "A09:2025"
+    name: "Security Logging and Alerting Failures"
+    description: "Insufficient logging/alerting lets attacks go undetected; verbose errors also leak internals."
+    remediations:
+      - "Log auth/access/input-validation failures in a SIEM-consumable format."
+      - "Suppress verbose errors to clients; establish alerting and response."
+
+  - id: "A10:2025"
+    name: "Mishandling of Exceptional Conditions"
+    description: "Improper handling of errors and edge cases — uncaught exceptions, leaked stack traces, fail-open logic, debug modes left enabled."
+    remediations:
+      - "Fail closed; return generic error pages and disable debug in production."
+      - "Handle and test exceptional paths explicitly; never leak stack traces."

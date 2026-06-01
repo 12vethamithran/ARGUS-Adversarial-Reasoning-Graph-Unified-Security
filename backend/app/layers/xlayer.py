@@ -32,7 +32,7 @@ def _l1_ssrf(state: "ArgusState") -> list["Finding"]:
     return [
         f for f in state.findings.values()
         if f.layer == 1 and f.exploitable
-        and ((f.evidence or {}).get("family") == "ssrf" or (f.owasp_ref == "A10:2021"))
+        and ((f.evidence or {}).get("family") == "ssrf")
     ]
 
 

@@ -24,7 +24,7 @@ import math
 import re
 import time
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
 
@@ -49,27 +49,27 @@ SECRET_RE = re.compile(
 )
 
 SECURITY_HEADERS = [
-    ("Content-Security-Policy", "Missing CSP header", "medium", "A05:2021"),
-    ("X-Frame-Options",         "Missing X-Frame-Options (clickjacking)", "low", "A05:2021"),
-    ("X-Content-Type-Options",  "Missing X-Content-Type-Options", "low", "A05:2021"),
-    ("Strict-Transport-Security","Missing HSTS header", "medium", "A05:2021"),
-    ("Referrer-Policy",         "Missing Referrer-Policy", "info", "A05:2021"),
-    ("Permissions-Policy",      "Missing Permissions-Policy", "info", "A05:2021"),
+    ("Content-Security-Policy", "Missing CSP header", "medium", "A02:2025"),
+    ("X-Frame-Options",         "Missing X-Frame-Options (clickjacking)", "low", "A02:2025"),
+    ("X-Content-Type-Options",  "Missing X-Content-Type-Options", "low", "A02:2025"),
+    ("Strict-Transport-Security","Missing HSTS header", "medium", "A02:2025"),
+    ("Referrer-Policy",         "Missing Referrer-Policy", "info", "A02:2025"),
+    ("Permissions-Policy",      "Missing Permissions-Policy", "info", "A02:2025"),
 ]
 
 # Sensitive paths probed concurrently. (path, severity, exploitable, owasp_ref).
 # Each hit is confirmed by a content signature (_looks_exposed) so that SPAs /
 # catch-all 200 routes don't produce false positives.
 SENSITIVE_PATHS = [
-    ("/.env",                     "critical", True,  "A05:2021"),
-    ("/.git/config",              "critical", True,  "A05:2021"),
-    ("/.git/HEAD",                "high",     True,  "A05:2021"),
-    ("/.aws/credentials",         "critical", True,  "A02:2021"),
-    ("/config.json",              "high",     True,  "A05:2021"),
-    ("/actuator/env",             "high",     True,  "A05:2021"),
-    ("/server-status",            "medium",   False, "A05:2021"),
-    ("/swagger.json",             "low",      False, "A05:2021"),
-    ("/.well-known/security.txt", "info",     False, "A05:2021"),
+    ("/.env",                     "critical", True,  "A02:2025"),
+    ("/.git/config",              "critical", True,  "A02:2025"),
+    ("/.git/HEAD",                "high",     True,  "A02:2025"),
+    ("/.aws/credentials",         "critical", True,  "A04:2025"),
+    ("/config.json",              "high",     True,  "A02:2025"),
+    ("/actuator/env",             "high",     True,  "A02:2025"),
+    ("/server-status",            "medium",   False, "A02:2025"),
+    ("/swagger.json",             "low",      False, "A02:2025"),
+    ("/.well-known/security.txt", "info",     False, "A02:2025"),
 ]
 
 # Reflected-input canary: a unique token wrapped in markup that, if it appears
@@ -77,9 +77,10 @@ SENSITIVE_PATHS = [
 REFLECT_CANARY = "argus<xss>7f3a"
 
 # Discovery / probing safety caps.
-MAX_PARAMS_PROBED = 6        # most fuzzed params per target
-MAX_CONNECTIONS = 8          # httpx connection pool ceiling
-PROBE_CONCURRENCY = 6        # in-flight active probes
+MAX_PARAMS_PROBED = 6        # most fuzzed params per target endpoint
+MAX_CONNECTIONS = 16         # httpx connection pool ceiling
+PROBE_CONCURRENCY = 12       # in-flight active probes (bounded by a semaphore)
+MAX_CRAWL_ENDPOINTS = 5      # extra same-origin endpoints discovered + probed
 
 
 def _looks_exposed(path: str, status: int, text: str) -> bool:
@@ -108,12 +109,70 @@ def _looks_exposed(path: str, status: int, text: str) -> bool:
     return False
 
 
-# ── Parameter / form discovery (regex-based, no extra deps) ───────────────────
+# ── Parameter / form / link discovery (regex-based, no extra deps) ────────────
 _INPUT_NAME_RE = re.compile(r'(?i)<(?:input|textarea|select)\b[^>]*\bname\s*=\s*["\']([^"\']+)["\']')
 _FORM_RE = re.compile(r'(?i)<form\b([^>]*)>(.*?)</form>', re.DOTALL)
 _ACTION_RE = re.compile(r'(?i)\baction\s*=\s*["\']([^"\']*)["\']')
 _METHOD_RE = re.compile(r'(?i)\bmethod\s*=\s*["\']([^"\']*)["\']')
 _SCRIPT_SRC_RE = re.compile(r'(?i)<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\'][^>]*>')
+_HREF_RE = re.compile(r'(?i)<a\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']')
+# A hidden anti-CSRF token field inside a form body.
+_CSRF_FIELD_RE = re.compile(
+    r'(?i)name\s*=\s*["\'][^"\']*(csrf|xsrf|_token|authenticity_token|nonce|verification)[^"\']*["\']')
+
+
+def discover_endpoints(base_url: str, html: str) -> list[str]:
+    """Same-origin endpoints (with query params or form actions) worth probing.
+
+    A lightweight, bounded crawl: most real apps put injectable params on deep
+    endpoints, not the homepage. We extract <a href> links that carry a query
+    string and <form action> targets, keep only same-origin ones, and return
+    the base URL first. Capped by MAX_CRAWL_ENDPOINTS.
+    """
+    base = urlparse(base_url)
+    origin = base.netloc
+    out, seen = [base_url], {base_url.split("#", 1)[0]}
+
+    candidates = [m.group(1) for m in _HREF_RE.finditer(html or "")]
+    for attrs, _body in _FORM_RE.findall(html or ""):
+        am = _ACTION_RE.search(attrs)
+        if am:
+            candidates.append(am.group(1))
+
+    for href in candidates:
+        if not href or href.startswith(("#", "mailto:", "javascript:", "tel:")):
+            continue
+        absu = urljoin(base_url, href)
+        parts = urlparse(absu)
+        if parts.scheme not in ("http", "https") or parts.netloc != origin:
+            continue
+        # Prioritise endpoints that actually take parameters.
+        if not parts.query:
+            continue
+        key = absu.split("#", 1)[0]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(absu)
+        if len(out) >= 1 + MAX_CRAWL_ENDPOINTS:
+            break
+    return out
+
+
+def discover_forms(base_url: str, html: str) -> list[dict]:
+    """Forms on the page: {action, method, inputs, has_csrf_token}."""
+    forms = []
+    for attrs, body in _FORM_RE.findall(html or ""):
+        am = _ACTION_RE.search(attrs)
+        mm = _METHOD_RE.search(attrs)
+        action = urljoin(base_url, am.group(1)) if am and am.group(1) else base_url
+        method = (mm.group(1) if mm else "get").lower()
+        inputs = _INPUT_NAME_RE.findall(body)
+        forms.append({
+            "action": action, "method": method, "inputs": inputs,
+            "has_csrf_token": bool(_CSRF_FIELD_RE.search(body)),
+        })
+    return forms
 
 
 def discover_params(url: str, html: str) -> list[str]:
@@ -235,14 +294,14 @@ class WebLayer(BaseLayer):
         if acao == "*":
             findings.append(self._finding(
                 title="CORS wildcard (*) allows any origin",
-                severity="high", owasp_ref="A05:2021",
+                severity="high", owasp_ref="A02:2025",
                 evidence={"header": "Access-Control-Allow-Origin: *", "url": url},
                 exploitable=True, confidence=0.92,
             ))
         elif acao:
             findings.append(self._finding(
                 title=f"CORS allows origin: {acao}",
-                severity="info", owasp_ref="A05:2021",
+                severity="info", owasp_ref="A02:2025",
                 evidence={"header": f"Access-Control-Allow-Origin: {acao}"},
                 exploitable=False, confidence=0.8,
             ))
@@ -254,7 +313,7 @@ class WebLayer(BaseLayer):
         if banner and any(c.isdigit() for c in banner):
             findings.append(self._finding(
                 title=f"Component version disclosed: {banner}",
-                severity="low", owasp_ref="A06:2021", mitre_ref="T1592",
+                severity="low", owasp_ref="A03:2025", mitre_ref="T1592",
                 evidence={"server": server, "x_powered_by": powered,
                           "note": "Version fingerprint — cross-checked against known CVEs in L6"},
                 exploitable=False, confidence=0.85,
@@ -267,7 +326,7 @@ class WebLayer(BaseLayer):
             if entropy > 3.5:
                 findings.append(self._finding(
                     title=f"High-entropy secret in response: {key_name}",
-                    severity="critical", owasp_ref="A02:2021",
+                    severity="critical", owasp_ref="A04:2025",
                     evidence={"key": key_name, "entropy": round(entropy, 2), "sample": value[:8] + "..."},
                     exploitable=True, confidence=0.78,
                 ))
@@ -276,7 +335,7 @@ class WebLayer(BaseLayer):
         if final_url.startswith("http://"):
             findings.append(self._finding(
                 title="Site served over cleartext HTTP (no TLS)",
-                severity="medium", owasp_ref="A02:2021",
+                severity="medium", owasp_ref="A04:2025",
                 evidence={"final_url": final_url},
                 exploitable=False, confidence=0.9,
             ))
@@ -297,7 +356,7 @@ class WebLayer(BaseLayer):
                 findings.append(self._finding(
                     title=f"Cookie '{name}' missing flags: {', '.join(missing)}",
                     severity="medium" if is_session else "low",
-                    owasp_ref="A07:2021" if is_session else "A05:2021",
+                    owasp_ref="A07:2025" if is_session else "A02:2025",
                     evidence={"cookie": name, "missing_flags": missing, "session_cookie": is_session},
                     exploitable=False, confidence=0.85,
                 ))
@@ -306,7 +365,7 @@ class WebLayer(BaseLayer):
         if "<title>Index of /" in body or "Directory listing for" in body:
             findings.append(self._finding(
                 title="Directory listing enabled",
-                severity="medium", owasp_ref="A05:2021",
+                severity="medium", owasp_ref="A02:2025",
                 evidence={"url": final_url},
                 exploitable=False, confidence=0.8,
             ))
@@ -315,7 +374,7 @@ class WebLayer(BaseLayer):
         if wp.STACKTRACE_SIGNATURE.search(full_body):
             findings.append(self._finding(
                 title="Verbose error / stack trace leaked in response",
-                severity="medium", owasp_ref="A04:2021", mitre_ref="T1592",
+                severity="medium", owasp_ref="A10:2025", mitre_ref="T1592",
                 evidence={"url": final_url, "signal": "stack-trace signature in body",
                           "note": "Insufficient error handling / logging hygiene (A04/A09)."},
                 exploitable=False, confidence=0.75,
@@ -330,7 +389,7 @@ class WebLayer(BaseLayer):
             if is_external and "integrity" not in tag.lower():
                 findings.append(self._finding(
                     title="External script loaded without Subresource Integrity (SRI)",
-                    severity="low", owasp_ref="A08:2021", mitre_ref="T1195",
+                    severity="low", owasp_ref="A08:2025", mitre_ref="T1195",
                     evidence={"script_src": src[:200]},
                     exploitable=False, confidence=0.7,
                 ))
@@ -341,40 +400,62 @@ class WebLayer(BaseLayer):
     # ── Active probing orchestrator ───────────────────────────────────────────
     async def _active_probes(self, url, final_url, full_body) -> list[Finding]:
         findings: list[Finding] = []
-        params = discover_params(url, full_body)[:MAX_PARAMS_PROBED]
         base = final_url.split("#", 1)[0].split("?", 1)[0].rstrip("/")
 
+        # Bounded same-origin crawl: real apps put injectable params on deep
+        # endpoints, not the homepage. Probe the entry URL + a few discovered
+        # endpoints that actually take parameters.
+        endpoints = discover_endpoints(final_url, full_body)
+        forms = discover_forms(final_url, full_body)
+        # (endpoint, params) pairs — base first; cap injection breadth for speed.
+        endpoint_params = [
+            (ep, discover_params(ep, full_body if ep == final_url else "")[:MAX_PARAMS_PROBED])
+            for ep in endpoints[:3]
+        ]
+
+        # follow_redirects=True so sites that 301/redirect still reach the live
+        # handler; open-redirect/sensitive-path probes override per-request.
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(connect=4.0, read=max(wp.MAX_TIME_BASED_DELAY + 4.0, 8.0),
                                   write=4.0, pool=4.0),
-            verify=False, follow_redirects=False,
+            verify=False, follow_redirects=True,
             limits=httpx.Limits(max_connections=MAX_CONNECTIONS),
             headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
         ) as client:
             sem = asyncio.Semaphore(PROBE_CONCURRENCY)
 
-            # Baseline page for boolean/timing comparisons (param echoed as benign).
-            baseline_url = _set_param(url, params[0], "argusbaseline") if params else url
-            baseline_text, baseline_lat = await self._timed_get(client, sem, baseline_url)
+            # CSRF (A01) is a passive read of the discovered forms — no requests.
+            findings += self._probe_csrf(forms)
 
-            # Injection families across discovered params.
-            findings += await self._probe_injection(
-                client, sem, url, params, baseline_text, baseline_lat)
+            # All probe groups run concurrently; each request is bounded by `sem`.
+            groups = await asyncio.gather(
+                self._probe_injection(client, sem, endpoint_params),
+                self._probe_methods(client, url),
+                self._probe_access_control(client, sem, base),
+                self._probe_sensitive_paths(client, sem, base),
+                *[self._probe_open_redirect(client, sem, ep, p) for ep, p in endpoint_params],
+                *[self._probe_ssrf(client, sem, ep, p) for ep, p in endpoint_params],
+                *[self._probe_idor(client, sem, ep, p) for ep, p in endpoint_params],
+            )
+            for g in groups:
+                findings += g
 
-            # Open redirect (param-targeted) and SSRF (param-targeted).
-            findings += await self._probe_open_redirect(client, sem, url, params)
-            findings += await self._probe_ssrf(client, sem, url, params)
+        return findings
 
-            # Broken access control: force-browse privileged paths.
-            findings += await self._probe_access_control(client, sem, base)
-
-            # IDOR on numeric/id-looking params.
-            findings += await self._probe_idor(client, sem, url, params)
-
-            # HTTP methods (A05) + sensitive path exposure (A05/A02).
-            findings += await self._probe_methods(client, url)
-            findings += await self._probe_sensitive_paths(client, sem, base)
-
+    # ── A01 CSRF (passive, from discovered forms) ─────────────────────────────
+    def _probe_csrf(self, forms) -> list[Finding]:
+        findings: list[Finding] = []
+        for form in forms:
+            if form["method"] == "post" and not form["has_csrf_token"] and form["inputs"]:
+                findings.append(self._finding(
+                    title=f"State-changing form without anti-CSRF token: {form['action']}",
+                    severity="medium", owasp_ref="A01:2025", mitre_ref="T1190",
+                    evidence={"action": form["action"], "method": "POST",
+                              "inputs": form["inputs"][:8], "family": "csrf",
+                              "signal": "POST form has no hidden csrf/xsrf/_token field"},
+                    exploitable=True, confidence=0.68,
+                ))
+                break  # one representative CSRF finding is sufficient
         return findings
 
     # ── A05 dangerous HTTP methods ────────────────────────────────────────────
@@ -387,7 +468,7 @@ class WebLayer(BaseLayer):
         if "DELETE" in allow or "PUT" in allow:
             return [self._finding(
                 title=f"Dangerous HTTP methods enabled: {allow}",
-                severity="medium", owasp_ref="A05:2021",
+                severity="medium", owasp_ref="A02:2025",
                 evidence={"allow": allow}, exploitable=True, confidence=0.7,
             )]
         return []
@@ -399,7 +480,7 @@ class WebLayer(BaseLayer):
         async def _probe(p):
             async with sem:
                 try:
-                    return p, await client.get(base + p)
+                    return p, await client.get(base + p, follow_redirects=False)
                 except Exception:
                     return p, None
 
@@ -427,27 +508,43 @@ class WebLayer(BaseLayer):
             except Exception:
                 return "", 0.0
 
-    # ── A03 / A01 injection families ──────────────────────────────────────────
-    async def _probe_injection(self, client, sem, url, params,
-                               baseline_text, baseline_lat) -> list[Finding]:
-        findings: list[Finding] = []
-        # (family payloads, hint-filter or None) — redirect/ssrf handled separately.
+    # ── A05 / A01 injection families (parallel across endpoints × params) ─────
+    async def _probe_injection(self, client, sem, endpoint_params) -> list[Finding]:
         families = [wp.SQLI_PAYLOADS, wp.XSS_PAYLOADS, wp.TRAVERSAL_PAYLOADS,
                     wp.CMDI_PAYLOADS, wp.SSTI_PAYLOADS]
 
-        for param in params:
-            confirmed_families: set[str] = set()
-            for fam in families:
-                for pd in fam:
-                    if pd["family"] in confirmed_families:
-                        break  # already confirmed this family on this param
-                    f = await self._run_payload(client, sem, url, param, pd,
-                                                baseline_text, baseline_lat)
-                    if f is not None:
-                        findings.append(f)
-                        if f.exploitable:
-                            confirmed_families.add(pd["family"])
-        return findings
+        # One benign baseline per endpoint, fetched concurrently — needed for the
+        # boolean/time-based comparisons.
+        baselines: dict[str, tuple[str, float]] = {}
+
+        async def _baseline(ep, params):
+            bu = _set_param(ep, params[0], "argusbaseline") if params else ep
+            baselines[ep] = await self._timed_get(client, sem, bu)
+
+        await asyncio.gather(*(_baseline(ep, p) for ep, p in endpoint_params if p))
+
+        # Fan out every (endpoint, param, payload) probe concurrently; the
+        # semaphore caps real in-flight requests so this stays fast and polite.
+        tasks = []
+        for ep, params in endpoint_params:
+            bt, bl = baselines.get(ep, ("", 0.0))
+            for param in params:
+                for fam in families:
+                    for pd in fam:
+                        tasks.append(self._run_payload(client, sem, ep, param, pd, bt, bl))
+
+        results = [f for f in await asyncio.gather(*tasks) if f is not None]
+
+        # Dedupe: keep one finding per (url, param, family) — prefer the exploited
+        # one — so a confirmed SQLi doesn't emit ten near-identical entries.
+        best: dict[tuple, Finding] = {}
+        for f in results:
+            ev = f.evidence
+            key = (ev.get("url"), ev.get("param"), ev.get("family"))
+            cur = best.get(key)
+            if cur is None or (f.exploitable and not cur.exploitable):
+                best[key] = f
+        return list(best.values())
 
     async def _run_payload(self, client, sem, url, param, pd,
                            baseline_text, baseline_lat) -> Finding | None:
@@ -536,7 +633,7 @@ class WebLayer(BaseLayer):
                 probe = _set_param(url, param, pd["payload"])
                 async with sem:
                     try:
-                        r = await client.get(probe)
+                        r = await client.get(probe, follow_redirects=False)
                     except Exception:
                         continue
                 loc = r.headers.get("location", "")
@@ -596,7 +693,7 @@ class WebLayer(BaseLayer):
             if _looks_privileged(r.text):
                 findings.append(self._finding(
                     title=f"Privileged path reachable without auth: {path}",
-                    severity="high", owasp_ref="A01:2021", mitre_ref="T1190",
+                    severity="high", owasp_ref="A01:2025", mitre_ref="T1190",
                     evidence={"path": path, "status": r.status_code,
                               "signal": "admin/management UI content", "snippet": r.text[:160],
                               "verdict": "exploited"},
@@ -628,7 +725,7 @@ class WebLayer(BaseLayer):
                     if 0.5 < sim < 0.97:
                         findings.append(self._finding(
                             title=f"Possible IDOR: '{param}'={n}→{n+delta} returns another object",
-                            severity="high", owasp_ref="A01:2021", mitre_ref="T1539",
+                            severity="high", owasp_ref="A01:2025", mitre_ref="T1539",
                             evidence={"param": param, "from": n, "to": n + delta,
                                       "body_similarity": round(sim, 3),
                                       "verdict": "suspicious"},
