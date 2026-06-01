@@ -9,14 +9,20 @@ from app.engine.target_profile import target_seed, jitter
 if TYPE_CHECKING:
     from app.engine.state import ArgusState
 
-_ALL_ROLES = ["web-frontend", "api-gateway", "llm-inference", "rag-vector-db", "admin-panel", "internal-db"]
+_ALL_ROLES = ["web-frontend", "api-gateway", "llm-inference", "rag-vector-db",
+              "admin-panel", "internal-db", "cache", "message-queue",
+              "secrets-vault", "container-orchestrator"]
 _PORTS_MAP = {
-    "web-frontend":   [80, 443, 8080],
-    "api-gateway":    [8000, 8443, 3000],
-    "llm-inference":  [11434, 5000, 8080],
-    "rag-vector-db":  [6333, 19530, 8080],
-    "admin-panel":    [8888, 9000, 443],
-    "internal-db":    [5432, 3306, 27017],
+    "web-frontend":          [80, 443, 8080],
+    "api-gateway":           [8000, 8443, 3000],
+    "llm-inference":         [11434, 5000, 8080],
+    "rag-vector-db":         [6333, 19530, 8080],
+    "admin-panel":           [8888, 9000, 443],
+    "internal-db":           [5432, 3306, 27017],
+    "cache":                 [6379, 11211],
+    "message-queue":         [5672, 9092, 15672],
+    "secrets-vault":         [8200, 8201],
+    "container-orchestrator":[6443, 2379, 10250],
 }
 
 
@@ -64,7 +70,8 @@ class NetworkLayer(BaseLayer):
 
         # Check for sensitive services exposed — only fires if THIS target's
         # sampled estate actually exposes a db/admin tier.
-        sensitive = [h for h in hosts if "db" in h["role"] or "admin" in h["role"]]
+        _SENSITIVE_ROLES = ("db", "admin", "vault", "secrets", "orchestrator")
+        sensitive = [h for h in hosts if any(k in h["role"] for k in _SENSITIVE_ROLES)]
         if sensitive:
             # More exposed sensitive services => higher confidence it's reachable.
             conf = jitter(target, "l5-sensitive", min(0.6 + 0.1 * len(sensitive), 0.9), 0.05)

@@ -23,14 +23,18 @@ def _build_agent_topology(seed: int) -> nx.DiGraph:
         {"id": "llm-agent-2",  "role": "code gen",     "trust": 0.85},
         {"id": "rag-agent",    "role": "retrieval",    "trust": 0.75},
         {"id": "tool-agent",   "role": "executor",     "trust": 0.7},
+        {"id": "email-agent",  "role": "comms",        "trust": 0.65},
+        {"id": "planner-agent","role": "planner",      "trust": 0.88},
     ]
     for a in agents:
         G.add_node(a["id"], **a)
     edges = [
         ("orchestrator", "web-agent"), ("orchestrator", "llm-agent-1"),
-        ("orchestrator", "llm-agent-2"), ("llm-agent-1", "rag-agent"),
+        ("orchestrator", "llm-agent-2"), ("orchestrator", "planner-agent"),
+        ("planner-agent", "tool-agent"), ("llm-agent-1", "rag-agent"),
         ("rag-agent", "llm-agent-2"), ("llm-agent-2", "tool-agent"),
-        ("web-agent", "llm-agent-1"),
+        ("web-agent", "llm-agent-1"), ("tool-agent", "email-agent"),
+        ("llm-agent-2", "email-agent"),
     ]
     for src, dst in edges:
         G.add_edge(src, dst, weight=rng.uniform(0.6, 0.95))
