@@ -157,6 +157,46 @@ flowchart TB
 
 > **Basic mode** runs L1–L3 (quick assessment, light theme). **Advanced mode** runs all 8 layers + sandboxed terminal (dark war-room theme).
 
+Every layer subclasses `BaseLayer` (`backend/app/layers/base.py`) and implements one contract — `async run(target, state) -> list[Finding]`. Each `run` receives the **shared `ArgusState`**, so a layer can read every finding produced by the layers before it and build a grounded next hop. The sections below describe what each layer actually does in code.
+
+### L1 · Web Surface — OWASP Web Top 10 (2021)
+**File:** `layers/web.py` + `layers/web_payloads.py`
+The only layer that talks to a real target. It fetches a baseline page, then runs **passive** analysis (security headers, CORS, cleartext transport, high-entropy secrets, cookie flags, directory listing, sensitive-path exposure, version banners, missing SRI, stack-trace leakage) **and active, signature-confirmed probes** driven by a versioned payload taxonomy. It covers all ten OWASP categories — A01 broken access control (IDOR, force-browse, open redirect), A02 crypto, A03 injection (SQLi/XSS/SSTI/cmd/traversal), A04/A09 error & logging hygiene, A05 misconfig, A06 component versions, A07 auth, A08 integrity, A10 SSRF. → [full deep dive below](#layer-1--full-owasp-web-top-10-engine).
+**Cross-layer role:** its confirmed injectable/reflected params become L2 injection channels; version banners feed L6; SSRF reach feeds L5.
+
+### L2 · LLM Probe — OWASP LLM01/02/06/07:2025
+**File:** `layers/llm_probe.py`
+If given an LLM endpoint it probes directly; if given only a URL it **auto-discovers** the API by trying common paths (`/v1/chat/completions`, `/api/chat`, …) across multiple request schemas (OpenAI, Anthropic, Ollama, generic) and fingerprints the provider. It then fires a **versioned injection taxonomy** (`INJECTION_PAYLOADS`, PI-001…PI-012) spanning families: jailbreak, indirect injection, system-prompt leakage, encoding, context overflow, **unicode/leetspeak obfuscation, payload-splitting, dev-mode persona, tool-call exfiltration (LLM06), insecure output handling (LLM02), and crescendo multi-turn**. A verdict engine (`_classify`) scores each response as `refused / exploited / suspicious / inconclusive` — refusals are checked first, and exploitation requires a **payload-specific proof token** or corroborated leak signals to avoid false positives. With no endpoint it runs a description-driven *hypothetical* analysis.
+**Cross-layer role:** consumes confirmed L1 injection/reflected params (`_l1_channels`) and re-frames them as **indirect prompt-injection channels** that reach the model's context.
+
+### L3 · RAG Poisoning — OWASP LLM08:2025 (PoisonedRAG model)
+**File:** `layers/rag_poison.py`
+Activates when a RAG signal is present (description keywords or an L2 retrieval finding). It builds an **in-memory corpus** whose size is seeded deterministically from the target, injects a set of **adversarial documents** (`ADVERSARIAL_DOCS`) — direct instruction override, false-policy injection, hidden HTML-comment exfiltration, keyword-stuffing, citation/authority spoofing, instruction-embedding — then computes a **retrieval-displacement metric** using mock embeddings + cosine similarity to show which adversarial docs out-rank benign results for a query.
+**Cross-layer role:** an exploitable L2 injection (`_l2_injection_vectors`) can be **written into the corpus**, converting a per-session injection into durable, cross-session poison.
+
+### L4 · MCP / Agentic — OWASP Agentic Top 10 (CVE-2025-6514 class)
+**File:** `layers/mcp_agent.py`
+Activates on agentic signals. It stands up a **mock MCP harness** of tools with permissions and missing validation flags, then evaluates an attack-scenario taxonomy (`ATTACK_SCENARIOS`, MCP-001…MCP-007): tool-call hijack, confused deputy, rug-pull, excessive permissions, **tool shadowing, tool-argument injection, and tool-description poisoning**. It identifies which tools are dangerous **sinks** (shell/exec, db:write, network egress, email) reachable without per-call authorization.
+**Cross-layer role:** consumes a poisoned RAG corpus (`_l3_poison_vectors`) as the *delivery mechanism* — poisoned retrieval injects instructions into the agent context that terminate at a real write/exec sink tool.
+
+### L5 · Network Recon — MITRE ATT&CK T1046 / T1021
+**File:** `layers/network.py`
+Models the internal estate. In real mode it consumes whitelisted-terminal `nmap` output; otherwise it **simulates a topology deterministically** from the target hash so each target exposes a different, reproducible mix of services (web-frontend, api-gateway, llm-inference, rag-vector-db, admin-panel, internal-db, **cache, message-queue, secrets-vault, container-orchestrator**) with realistic open ports. It surfaces reachable sensitive services, **lateral-movement paths** (web→db), and exposed LLM inference endpoints (LLM09).
+
+### L6 · Supply Chain — OWASP A06:2021 / SkillJect
+**File:** `layers/supply_chain.py` + `kb/vuln_db.py`
+Two modes. With a real dependency **manifest** it parses declared packages, matches pinned versions against the bundled vuln KB (deterministic, no network), and flags **typosquats** via Levenshtein distance against popular package names. Without one it runs a heuristic pass over candidate CVEs (gated per target) and a curated typosquat set, plus a **SkillJect** risk when agentic signals are present (unvetted skill installation can execute code post-install).
+
+### L7 · Multi-Agent Propagation — MASpi / Prompt Infection
+**File:** `layers/multi_agent.py`
+Builds a directed **agent mesh** in NetworkX (orchestrator, web/summarizer/code-gen/retrieval/executor/comms/planner agents) with trust-weighted edges, then runs a **prompt-infection diffusion simulation** seeded from the target: starting from one compromised agent, infection spreads hop-by-hop with probability driven by edge weight and target trust. It reports the infection rate, whether the **orchestrator** is compromised (full-mesh takeover), and unenforced inter-agent trust boundaries.
+**Cross-layer role:** a confirmed L4 agent compromise (`_l4_agent_compromise`) becomes a **real infection seed**, so mesh propagation is reachable rather than hypothetical.
+
+### L8 · Identity / OAuth — MITRE ATLAS
+**File:** `layers/identity.py`
+Evaluates a per-target-gated set of identity weaknesses (`OAUTH_CHECKS`, ID-001…ID-008): plaintext session token in a URL parameter, over-broad OAuth scope, missing PKCE, no session TTL, missing multi-agent authorization boundary, **refresh-token replay, session fixation, and JWT algorithm confusion**. Each surfaces with a target-derived confidence so different targets get a different identity-risk profile.
+**Cross-layer role:** a hijacked L4 agent plus a weak identity boundary yields **durable re-entry** — leaked/over-broad tokens give the attacker access that survives session cleanup.
+
 ---
 
 ## Layer 1 — Full OWASP Web Top 10 Engine
