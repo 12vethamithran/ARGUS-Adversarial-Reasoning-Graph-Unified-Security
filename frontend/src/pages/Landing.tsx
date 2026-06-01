@@ -12,12 +12,12 @@ const ACCENTS = {
 };
 
 const LAYERS = [
-  { id: 1, Icon: Globe,    label: "Web Surface",      std: "OWASP Web Top 10" },
+  { id: 1, Icon: Globe,    label: "Web Surface",      std: "OWASP Web Top 10 2025" },
   { id: 2, Icon: Bot,      label: "LLM Probe",        std: "OWASP LLM01/07:2025" },
   { id: 3, Icon: Database, label: "RAG Poisoning",    std: "OWASP LLM08:2025" },
   { id: 4, Icon: Wrench,   label: "MCP / Agentic",    std: "Agentic Top 10" },
   { id: 5, Icon: Radar,    label: "Network Recon",    std: "MITRE T1046" },
-  { id: 6, Icon: Package,  label: "Supply Chain",     std: "OWASP A06:2021" },
+  { id: 6, Icon: Package,  label: "Supply Chain",     std: "OWASP A03:2025" },
   { id: 7, Icon: Users,    label: "Multi-Agent",      std: "MASpi" },
   { id: 8, Icon: KeyRound, label: "Identity / OAuth", std: "MITRE ATLAS" },
 ];

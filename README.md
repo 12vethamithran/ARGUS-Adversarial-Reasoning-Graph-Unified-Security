@@ -146,12 +146,12 @@ flowchart TB
 
 | # | Layer | Focus | Standard | Mode |
 |---|-------|-------|----------|------|
-| **L1** | Web Surface | **Full OWASP Web Top 10** — SQLi, XSS, IDOR, broken access control, SSRF, SSTI, command injection, path traversal, misconfig, crypto, integrity, logging | OWASP Web Top 10 (2021) | Basic + Advanced |
+| **L1** | Web Surface | **Full OWASP Web Top 10 (2025)** — SQLi, XSS, IDOR, broken access control, CSRF, SSRF, SSTI, command injection, path traversal, misconfig, crypto, supply-chain banners, integrity, logging, exceptional-condition handling | OWASP Web Top 10 (2025) | Basic + Advanced |
 | **L2** | LLM Probe | Direct/indirect prompt injection, jailbreaks, obfuscation, system-prompt leakage, insecure output handling, tool-call exfil | OWASP LLM01/02/06/07:2025 | Basic + Advanced |
 | **L3** | RAG Poisoning | Adversarial doc injection, retrieval displacement, citation spoofing, instruction embedding | OWASP LLM08:2025 | Basic + Advanced |
 | **L4** | MCP / Agentic | Tool-call hijack, confused deputy, rug-pull, tool shadowing, argument injection, excessive agency | OWASP Agentic Top 10 | Advanced |
 | **L5** | Network Recon | Topology, reachable services, lateral movement, exposed inference | MITRE ATT&CK T1046 / T1021 | Advanced |
-| **L6** | Supply Chain | Vulnerable deps (CVE), typosquats, unvetted skills (SkillJect) | OWASP A06:2021 | Advanced |
+| **L6** | Supply Chain | Vulnerable deps (CVE), typosquats, unvetted skills (SkillJect) | OWASP A03:2025 (Software Supply Chain Failures) | Advanced |
 | **L7** | Multi-Agent | Prompt-infection diffusion across an agent mesh | MASpi / Prompt Infection | Advanced |
 | **L8** | Identity / OAuth | Token interception, scope abuse, missing PKCE, refresh-token replay, session fixation, JWT alg confusion | MITRE ATLAS | Advanced |
 
@@ -159,9 +159,9 @@ flowchart TB
 
 Every layer subclasses `BaseLayer` (`backend/app/layers/base.py`) and implements one contract — `async run(target, state) -> list[Finding]`. Each `run` receives the **shared `ArgusState`**, so a layer can read every finding produced by the layers before it and build a grounded next hop. The sections below describe what each layer actually does in code.
 
-### L1 · Web Surface — OWASP Web Top 10 (2021)
+### L1 · Web Surface — OWASP Web Top 10 (2025)
 **File:** `layers/web.py` + `layers/web_payloads.py`
-The only layer that talks to a real target. It fetches a baseline page, then runs **passive** analysis (security headers, CORS, cleartext transport, high-entropy secrets, cookie flags, directory listing, sensitive-path exposure, version banners, missing SRI, stack-trace leakage) **and active, signature-confirmed probes** driven by a versioned payload taxonomy. It covers all ten OWASP categories — A01 broken access control (IDOR, force-browse, open redirect), A02 crypto, A03 injection (SQLi/XSS/SSTI/cmd/traversal), A04/A09 error & logging hygiene, A05 misconfig, A06 component versions, A07 auth, A08 integrity, A10 SSRF. → [full deep dive below](#layer-1--full-owasp-web-top-10-engine).
+The only layer that talks to a real target. It fetches a baseline page, performs a **bounded same-origin crawl** (form actions + links carrying query params — real apps put injectable params on deep endpoints, not the homepage), then runs **passive** analysis (security headers, CORS, cleartext transport, high-entropy secrets, cookie flags, directory listing, sensitive-path exposure, version banners, missing SRI, stack-trace leakage) **and active, signature-confirmed probes** driven by a versioned payload taxonomy. All probes run **concurrently** (bounded by a semaphore) so a full scan finishes in seconds. It maps to all ten OWASP **2025** categories — A01 broken access control (IDOR, force-browse, open redirect, **CSRF**, **SSRF**), A02 misconfiguration, A03 software supply-chain (component version banners → L6), A04 cryptographic failures, A05 injection (SQLi/XSS/SSTI/cmd/traversal), A06 insecure design, A07 auth, A08 integrity (SRI), A09 logging & alerting, A10 mishandling of exceptional conditions (stack-trace leakage). → [full deep dive below](#layer-1--full-owasp-web-top-10-engine).
 **Cross-layer role:** its confirmed injectable/reflected params become L2 injection channels; version banners feed L6; SSRF reach feeds L5.
 
 ### L2 · LLM Probe — OWASP LLM01/02/06/07:2025
@@ -183,7 +183,7 @@ Activates on agentic signals. It stands up a **mock MCP harness** of tools with 
 **File:** `layers/network.py`
 Models the internal estate. In real mode it consumes whitelisted-terminal `nmap` output; otherwise it **simulates a topology deterministically** from the target hash so each target exposes a different, reproducible mix of services (web-frontend, api-gateway, llm-inference, rag-vector-db, admin-panel, internal-db, **cache, message-queue, secrets-vault, container-orchestrator**) with realistic open ports. It surfaces reachable sensitive services, **lateral-movement paths** (web→db), and exposed LLM inference endpoints (LLM09).
 
-### L6 · Supply Chain — OWASP A06:2021 / SkillJect
+### L6 · Supply Chain — OWASP A03:2025 (Software Supply Chain Failures) / SkillJect
 **File:** `layers/supply_chain.py` + `kb/vuln_db.py`
 Two modes. With a real dependency **manifest** it parses declared packages, matches pinned versions against the bundled vuln KB (deterministic, no network), and flags **typosquats** via Levenshtein distance against popular package names. Without one it runs a heuristic pass over candidate CVEs (gated per target) and a curated typosquat set, plus a **SkillJect** risk when agentic signals are present (unvetted skill installation can execute code post-install).
 
@@ -201,26 +201,27 @@ Evaluates a per-target-gated set of identity weaknesses (`OAUTH_CHECKS`, ID-001�
 
 ## Layer 1 — Full OWASP Web Top 10 Engine
 
-Layer 1 is the deepest module. It maps to **every** OWASP Web Top 10 (2021) category using a **versioned payload taxonomy** (`backend/app/layers/web_payloads.py`) and active, signature-confirmed probes (`backend/app/layers/web.py`).
+Layer 1 is the deepest module. It maps to **every OWASP Web Top 10 (2025)** category — plus the classic named attacks (SQLi, XSS, SSRF, CSRF, …) — using a **versioned payload taxonomy** (`backend/app/layers/web_payloads.py`) and active, signature-confirmed probes (`backend/app/layers/web.py`). Findings carry both the **attack family name** (in title/evidence) and the **2025 OWASP category** (in `owasp_ref`).
 
 ```mermaid
 flowchart TB
     START["Target URL"] --> BASE["Baseline GET<br/>headers · body · cookies"]
+    BASE --> CRAWL["Bounded same-origin crawl<br/>form actions + links with params"]
     BASE --> PASSIVE["Passive checks"]
-    BASE --> DISCOVER["Param / form discovery<br/>query + &lt;input&gt; names"]
-    DISCOVER --> ACTIVE["Active probes<br/>(GET-only · rate-limited · capped)"]
+    CRAWL --> DISCOVER["Per-endpoint param / form discovery"]
+    DISCOVER --> ACTIVE["Active probes — concurrent<br/>(GET-only · semaphore-bounded · capped)"]
 
-    PASSIVE --> P1["A02 cleartext · secrets entropy"]
-    PASSIVE --> P2["A05 headers · CORS · methods · dir listing · sensitive paths"]
-    PASSIVE --> P3["A06 version fingerprint → feeds L6"]
+    PASSIVE --> P1["A04 cleartext · secrets entropy"]
+    PASSIVE --> P2["A02 headers · CORS · methods · dir listing · sensitive paths"]
+    PASSIVE --> P3["A03 version fingerprint → feeds L6"]
     PASSIVE --> P4["A07 session cookie flags"]
     PASSIVE --> P5["A08 missing SRI"]
-    PASSIVE --> P6["A04/A09 stack-trace leakage"]
+    PASSIVE --> P6["A10 stack-trace / exception leakage"]
 
-    ACTIVE --> A1["A03 SQLi<br/>error · boolean · time · union"]
-    ACTIVE --> A2["A03 XSS · SSTI · cmd injection"]
-    ACTIVE --> A3["A01 path traversal · IDOR · force-browse · open redirect"]
-    ACTIVE --> A4["A10 SSRF<br/>loopback · metadata · file://"]
+    ACTIVE --> A1["A05 SQLi<br/>error · boolean · time · union"]
+    ACTIVE --> A2["A05 XSS · SSTI · cmd injection"]
+    ACTIVE --> A3["A01 traversal · IDOR · force-browse · open redirect · CSRF"]
+    ACTIVE --> A4["A01 SSRF<br/>loopback · metadata · file://"]
 
     A1 & A2 & A3 & A4 --> CONFIRM["Signature confirmation<br/>SQL-error regex · 49 eval · uid= · root: · latency Δ · reflection"]
     CONFIRM --> FIND["Finding[] (verdict + evidence)"]
@@ -231,19 +232,22 @@ flowchart TB
 
 ### Attack families & techniques (multi-payload)
 
-| Family | OWASP | Techniques (multiple payloads each) | Confirmation signal |
-|--------|-------|--------------------------------------|----------------------|
-| **SQL Injection** | A03 | error-based · boolean-based · **time-based (≤5 s cap)** · union-based | DB-engine error regexes (MySQL/Postgres/MSSQL/Oracle/SQLite); response-similarity diff; latency delta |
-| **XSS** | A03 | HTML-body · attribute-breakout · JS-string context | Unescaped proof-token reflection |
-| **SSTI** | A03 | `{{7*7}}` · `${7*7}` · `<%=7*7%>` · `#{7*7}` | Evaluated `49` present, literal absent |
-| **Command Injection** | A03 | separator · subshell · time-based | `uid=…(` output or latency delta |
-| **Path Traversal / LFI** | A01 | `../` · URL-encoded · nested · Windows | `root:…:0:0:` / ini-section signature |
-| **IDOR** | A01 | bounded adjacent-ID probing (±1, +2) | Structurally-similar page, different object |
-| **Broken Access Control** | A01 | privileged-path force-browse | Admin/management UI content reachable unauth |
-| **Open Redirect** | A01 | protocol-relative · backslash · absolute | `Location` header points to attacker host |
-| **SSRF** | A10 | loopback · cloud metadata · `file://` | Internal content / metadata marker reflected |
+| Family | OWASP 2025 | Techniques (multiple payloads each) | Confirmation signal |
+|--------|------------|--------------------------------------|----------------------|
+| **SQL Injection** | A05 Injection | error-based · boolean-based · **time-based (≤5 s cap)** · union-based | DB-engine error regexes (MySQL/Postgres/MSSQL/Oracle/SQLite); response-similarity diff; latency delta |
+| **XSS** | A05 Injection | HTML-body · attribute-breakout · JS-string context | Unescaped proof-token reflection |
+| **SSTI** | A05 Injection | `{{7*7}}` · `${7*7}` · `<%=7*7%>` · `#{7*7}` | Evaluated `49` present, literal absent |
+| **Command Injection** | A05 Injection | separator · subshell · time-based | `uid=…(` output or latency delta |
+| **Path Traversal / LFI** | A01 Broken Access Control | `../` · URL-encoded · nested · Windows | `root:…:0:0:` / ini-section signature |
+| **IDOR** | A01 Broken Access Control | bounded adjacent-ID probing (±1, +2) | Structurally-similar page, different object |
+| **Broken Access Control** | A01 Broken Access Control | privileged-path force-browse | Admin/management UI content reachable unauth |
+| **CSRF** | A01 Broken Access Control | POST forms without an anti-CSRF token | No hidden `csrf/xsrf/_token` field in a state-changing form |
+| **Open Redirect** | A01 Broken Access Control | protocol-relative · backslash · absolute | `Location` header points to attacker host |
+| **SSRF** | A01 Broken Access Control | loopback · cloud metadata · `file://` | Internal content / metadata marker reflected |
 
-**Safety guarantees (authorized testing only):** all active probes are **GET-only and non-destructive**, requests are rate-limited (`Semaphore(6)`), the connection pool is capped (`max_connections=8`), at most 6 params are fuzzed, time-based payloads are clamped to `MAX_TIME_BASED_DELAY = 5 s`, and IDOR probing is bounded to a few adjacent IDs and never writes. Every hit is **confirmed by a content/timing signature** so catch-all 200 pages don't cause false positives.
+> **OWASP 2025 mapping notes:** SSRF and CSRF are folded into **A01 Broken Access Control** in the 2025 list; injection (SQLi/XSS/SSTI/cmd) is **A05**; component version banners map to **A03 Software Supply Chain Failures** and feed L6; leaked stack traces map to the new **A10 Mishandling of Exceptional Conditions**.
+
+**Safety & performance (authorized testing only):** all active probes are **GET-only and non-destructive**, run **concurrently bounded by a semaphore** (`PROBE_CONCURRENCY = 12`, pool `max_connections = 16`) so a full scan completes in seconds rather than minutes, at most 6 params per endpoint are fuzzed across a bounded crawl, time-based payloads are clamped to `MAX_TIME_BASED_DELAY = 5 s`, and IDOR probing is bounded to a few adjacent IDs and never writes. Every hit is **confirmed by a content/timing signature** so catch-all 200 pages don't cause false positives.
 
 ---
 
