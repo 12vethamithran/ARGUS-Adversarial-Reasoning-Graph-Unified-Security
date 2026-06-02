@@ -55,9 +55,8 @@ export function Onboarding({ onStart, onBack }: Props) {
     onStart();
   }
 
-  const accentClass = mode === "basic"
-    ? "border-sky-500/40 text-sky-500 bg-sky-500/10 hover:bg-sky-500/20"
-    : "border-rose-500/40 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20";
+  // Primary action follows the active theme accent (Furo orange-red for both modes).
+  const accentClass = "border-accent/40 text-accent bg-accent/10 hover:bg-accent/20";
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen px-6 py-12">
@@ -131,9 +130,7 @@ export function Onboarding({ onStart, onBack }: Props) {
           <motion.div key="target" initial={{ opacity:0, x:40 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-40 }}
             className="w-full max-w-xl space-y-5">
             <div className="text-center mb-8">
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono mb-3 border ${
-                mode === "basic" ? "border-accent/30 text-accent bg-accent/5" : "border-accent/30 text-accent bg-accent/5"
-              }`}>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono mb-3 border border-accent/30 text-accent bg-accent/5">
                 {mode === "basic" ? "Basic Mode" : "Advanced Mode"}
               </div>
               <h1 className="text-3xl font-bold text-text-primary mb-2">Define Your Target</h1>

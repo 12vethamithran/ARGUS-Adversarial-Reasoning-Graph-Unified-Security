@@ -206,6 +206,13 @@ input[type=range] { accent-color: rgb(var(--accent)); }
   mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
 
+/* ── Scroll perf: skip rendering work for off-screen sections ──
+   content-visibility lets the browser skip layout/paint for sections that are
+   not in the viewport, which keeps scrolling smooth on a long landing page.
+   contain-intrinsic-size reserves an estimated height so the scrollbar stays
+   stable while sections are skipped. */
+.cv-section { content-visibility: auto; contain-intrinsic-size: auto 600px; }
+
 /* ── Editorial helpers ─────────────────────────── */
 .text-balance { text-wrap: balance; }
 .display-tight { letter-spacing: -0.04em; line-height: 0.92; }
@@ -244,10 +251,13 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 @keyframes halftone-shift { from { background-position: 0 0; } to { background-position: 14px 0; } }
 .halftone-text { animation: halftone-shift 8s linear infinite; }
 
-/* Halftone "breathing" — dot size + glow pulse on the giant ARGUS word */
+/* Halftone "breathing" — opacity pulse only. We deliberately avoid animating
+   background-size or filter:drop-shadow here: both force a full repaint of the
+   giant 24vw text every frame, which is the main cause of scroll jank. Opacity
+   is GPU-composited and cheap. */
 @keyframes halftone-breathe {
-  0%, 100% { background-size: 7px 7px; filter: drop-shadow(0 0 0 transparent); }
-  50%      { background-size: 8.5px 8.5px; filter: drop-shadow(0 0 26px rgb(var(--accent) / 0.18)); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.82; }
 }
 .halftone-breathe { animation: halftone-shift 8s linear infinite, halftone-breathe 7s ease-in-out infinite; }
 

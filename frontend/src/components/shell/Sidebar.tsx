@@ -84,7 +84,7 @@ export function Sidebar() {
                               <p className="text-[11px] text-text-primary leading-snug">{f.title}</p>
                               <p className="text-[10px] text-text-muted leading-snug mt-0.5">{d.description}</p>
                               <div className="flex flex-wrap items-center gap-1 mt-1">
-                                <span className={`text-[9px] font-mono uppercase ${crit ? "" : ""} text-text-muted`}>{f.severity}</span>
+                                <span className="text-[9px] font-mono uppercase text-text-muted">{f.severity}</span>
                                 {f.exploitable && (
                                   <span className="text-[9px] font-mono text-severity-critical flex items-center gap-0.5">
                                     <CircleAlert className="w-2.5 h-2.5" /> exploitable

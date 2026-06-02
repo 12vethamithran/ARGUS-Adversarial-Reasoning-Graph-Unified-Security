@@ -90,7 +90,7 @@ const PROBLEM_LINES = [
 // enter; the particle cloud quietly drifts and condenses on a loop.
 function ProblemBand() {
   return (
-    <section className="relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
+    <section className="cv-section relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
       <Reveal>
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
@@ -188,7 +188,9 @@ export function Landing({ onEnter }: Props) {
   const sp = useSpring(scrollYProgress, { stiffness: 80, damping: 24, mass: 0.4 });
   const heroY = useTransform(sp, [0, 1], [0, -170]);
   const heroFade = useTransform(sp, [0, 0.55], [1, 0]);
-  const heroScale = useTransform(sp, [0, 0.6], [1, 1.14]);
+  // NOTE: we parallax only translate + opacity (both GPU-composited). A `scale`
+  // here would force the giant background-clip:text word to re-rasterize on every
+  // scroll frame — the main cause of the scroll lag — so it is intentionally gone.
 
   return (
     <div ref={ref} className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
@@ -212,7 +214,7 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── HERO (Furo dithered word + serif overlay) ── */}
       <header className="relative px-6 md:px-10 pt-10 pb-20 max-w-[1600px] mx-auto min-h-[92vh] flex flex-col">
-        <motion.div style={{ y: heroY, opacity: heroFade, scale: heroScale }} aria-hidden
+        <motion.div style={{ y: heroY, opacity: heroFade, willChange: "transform, opacity" }} aria-hidden
           className="absolute inset-x-4 md:inset-x-10 top-2 flex justify-between pointer-events-none select-none origin-top">
           {"ARGUS".split("").map((ch, i) => (
             <motion.span key={i}
@@ -253,7 +255,7 @@ export function Landing({ onEnter }: Props) {
         {/* end hero content */}
       </header>
 
-      {/* ── PROBLEM BAND (Furo scroll-pinned transition) ── */}
+      {/* ── PROBLEM BAND (normal-flow, copy staggers in on enter) ── */}
       <ProblemBand />
 
       {/* ── MARQUEE ── */}
@@ -313,7 +315,7 @@ export function Landing({ onEnter }: Props) {
       </Section>
 
       {/* ── STATS BAND ── */}
-      <section className="relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
+      <section className="cv-section relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
         <div className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
           {STATS.map((s, i) => (
             <Reveal key={s.l} delay={i * 0.06} className="text-center">
@@ -406,7 +408,7 @@ export function Landing({ onEnter }: Props) {
       </Section>
 
       {/* ── CTA ── */}
-      <section className="relative px-6 md:px-10 py-32 text-center border-t border-line/10">
+      <section className="cv-section relative px-6 md:px-10 py-32 text-center border-t border-line/10">
         <Reveal>
           <h2 className="font-serif-display text-5xl md:text-8xl leading-[1.02] mb-10">
             Reason about your<br /><span className="serif-italic">attack surface.</span>
@@ -431,7 +433,7 @@ export function Landing({ onEnter }: Props) {
 }
 
 function Section({ children, id }: { children: React.ReactNode; id?: string }) {
-  return <section id={id} className="relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">{children}</section>;
+  return <section id={id} className="cv-section relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">{children}</section>;
 }
 
 function ModeCard({ onHover, onLeave, onClick, accent, Icon, name, tag, points, ideal }: {

@@ -21,9 +21,9 @@ export default function App() {
   const [view, setView] = useState<View>("landing");
   const { reset, mode } = useSessionStore();
 
-  // Landing is always presented in the branded dark theme; once the user is in
-  // onboarding/dashboard the theme follows the selected scan mode
-  // (basic → light-blue, advanced → dark-red).
+  // Landing is always presented in the branded landing theme; once the user is
+  // in onboarding/dashboard the theme follows the selected scan mode. Both modes
+  // currently share the Furo black + orange-red palette (see index.css tokens).
   useEffect(() => {
     const theme = view === "landing" ? "landing" : mode;
     document.documentElement.dataset.theme = theme;
