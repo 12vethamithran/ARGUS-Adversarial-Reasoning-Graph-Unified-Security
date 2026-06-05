@@ -23,7 +23,6 @@ export function Sidebar() {
     list.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 
   const critCount = Object.values(findings).filter((f) => f.severity === "critical").length;
-  const highCount = Object.values(findings).filter((f) => f.severity === "high").length;
   const exploitable = Object.values(findings).filter((f) => f.exploitable).length;
 
   return (
