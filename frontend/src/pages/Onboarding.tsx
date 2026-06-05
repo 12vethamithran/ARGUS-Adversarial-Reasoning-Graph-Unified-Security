@@ -39,7 +39,7 @@ export function Onboarding({ onStart, onBack }: Props) {
   function toggleLayer(id: number) {
     if (id <= 3) return;
     setActiveLayers((prev) =>
-      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id].sort()
+      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id].sort((a, b) => a - b)
     );
   }
 

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSessionStore } from "../../store/sessionStore";
 import { openHtmlReport, downloadPdfReport, downloadStixReport } from "../../lib/api";
+import { toast } from "../ui/Toast";
 
 interface Command {
   id: string;
@@ -63,7 +64,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       label: "Export HTML Report",
       description: "Open the full threat report in a new tab",
       shortcut: "E H",
-      action: () => session && openHtmlReport(session.id),
+      action: () => session ? openHtmlReport(session.id) : toast.error("No active session to export."),
       keywords: ["report", "export", "html"],
     },
     {
@@ -71,7 +72,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       label: "Export PDF Report",
       description: "Download the threat report as PDF",
       shortcut: "E P",
-      action: () => session && downloadPdfReport(session.id),
+      action: () => session ? downloadPdfReport(session.id) : toast.error("No active session to export."),
       keywords: ["report", "pdf", "download"],
     },
     {
@@ -79,7 +80,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       label: "Export STIX 2.1",
       description: "Download structured threat intel as STIX JSON",
       shortcut: "E S",
-      action: () => session && downloadStixReport(session.id),
+      action: () => session ? downloadStixReport(session.id) : toast.error("No active session to export."),
       keywords: ["stix", "threat intel", "json", "export"],
     },
   ];
