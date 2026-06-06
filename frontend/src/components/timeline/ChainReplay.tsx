@@ -42,6 +42,8 @@ export function ChainReplay() {
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [playing, chain, maxStep]);
 
+  // Reset replay position when the selected chain changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setStep(0); setPlaying(false); }, [sel]);
 
   if (!chain) {

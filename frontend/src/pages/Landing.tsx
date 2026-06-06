@@ -162,12 +162,12 @@ function Reveal({ children, delay = 0, className }: { children: React.ReactNode;
   );
 }
 
+const fmtClock = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
 function useClock() {
-  const [t, setT] = useState("");
+  const [t, setT] = useState(fmtClock);
   useEffect(() => {
-    const fmt = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    setT(fmt());
-    const id = setInterval(() => setT(fmt()), 20_000);
+    const id = setInterval(() => setT(fmtClock()), 20_000);
     return () => clearInterval(id);
   }, []);
   return t;

@@ -146,6 +146,8 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
   }, [open]);
 
+  // Reset the highlighted result to the top whenever the query changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setSelected(0), [query]);
 
   if (!open) return null;
