@@ -4,6 +4,7 @@ import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
 } from "lucide-react";
+import { LiveAttackChain } from "../components/motion/LiveAttackChain";
 
 const ACCENTS = {
   neutral:  { a: "255 61 18", s: "217 45 10" },   // Furo orange-red
@@ -251,6 +252,15 @@ export function Landing({ onEnter }: Props) {
               poisons a RAG corpus that hijacks an agent.
             </motion.p>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 22, filter: "blur(5px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ delay: 0.7, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-10 max-w-4xl"
+          >
+            <LiveAttackChain />
+          </motion.div>
         </div>
         {/* end hero content */}
       </header>
