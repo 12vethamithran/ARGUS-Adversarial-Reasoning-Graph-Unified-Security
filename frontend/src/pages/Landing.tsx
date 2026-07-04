@@ -188,7 +188,7 @@ export function Landing({ onEnter }: Props) {
   // Spring-smoothed progress => buttery parallax that eases instead of snapping to scroll.
   const sp = useSpring(scrollYProgress, { stiffness: 80, damping: 24, mass: 0.4 });
   const heroY = useTransform(sp, [0, 1], [0, -170]);
-  const heroFade = useTransform(sp, [0, 0.55], [1, 0]);
+  const heroFade = useTransform(sp, [0, 0.55], [0.42, 0]);
   // NOTE: we parallax only translate + opacity (both GPU-composited). A `scale`
   // here would force the giant background-clip:text word to re-rasterize on every
   // scroll frame — the main cause of the scroll lag — so it is intentionally gone.
@@ -229,36 +229,34 @@ export function Landing({ onEnter }: Props) {
           ))}
         </motion.div>
 
-        {/* headline anchored to lower third, well clear of the dithered word */}
-        <div className="relative z-10 mt-auto">
-          <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-4xl">
-            Security that <span className="serif-italic">sees</span><br />every attack chain.
-          </motion.h1>
+        {/* headline and live motion have separate desktop lanes so neither fights the brand wordmark */}
+        <div className="relative z-10 mt-auto grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] lg:items-end">
+          <div>
+            <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+              className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-4xl">
+              Security that <span className="serif-italic">sees</span><br />every attack chain.
+            </motion.h1>
 
-          {/* CTA (left) + description (right) on one row, generous gap below headline */}
-          <div className="mt-16 grid md:grid-cols-[auto_1fr] items-end gap-x-10 gap-y-8">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
-              className="flex items-center gap-5">
+              className="mt-14 flex flex-wrap items-center gap-5">
               <button onClick={onEnter}
                 className="group flex items-center gap-3 px-7 py-4 rounded-full bg-accent text-[rgb(var(--accent-contrast))] font-medium tracking-wide hover:opacity-90 transition-all">
                 DISCOVER ARGUS <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
               </button>
               <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted whitespace-nowrap">OR SCROLL DOWN</span>
             </motion.div>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
-              className="md:justify-self-end md:text-right text-text-secondary leading-relaxed max-w-sm">
-              Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that
-              poisons a RAG corpus that hijacks an agent.
-            </motion.p>
           </div>
 
           <motion.div
             initial={{ opacity: 0, y: 22, filter: "blur(5px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ delay: 0.7, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-10 max-w-4xl"
+            transition={{ delay: 0.62, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-[560px] lg:justify-self-end"
           >
+            <p className="mb-5 text-text-secondary leading-relaxed max-w-md lg:ml-auto lg:text-right">
+              Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that
+              poisons a RAG corpus that hijacks an agent.
+            </p>
             <LiveAttackChain />
           </motion.div>
         </div>
