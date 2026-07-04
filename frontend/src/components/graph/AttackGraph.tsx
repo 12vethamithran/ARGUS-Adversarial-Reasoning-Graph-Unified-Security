@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Plus, Minus, Maximize2, X, CircleAlert, ShieldCheck } from "lucide-react";
+import { Plus, Minus, Maximize2, X, CircleAlert, ShieldCheck, Radar } from "lucide-react";
 import { useSessionStore } from "../../store/sessionStore";
 import { useForceGraph, type GraphControls } from "./useForceGraph";
 import { describeFinding, evidenceEntries } from "../../lib/findingKb";
@@ -30,7 +30,7 @@ export function AttackGraph() {
   const detail = selected ? describeFinding(selected) : null;
 
   return (
-    <div className="relative w-full h-full bg-bg-base scanlines rounded-lg border border-line/15 overflow-hidden">
+    <div className="argus-panel-shell relative w-full h-full bg-bg-base scanlines rounded-lg border border-line/15 overflow-hidden">
       {/* Header */}
       <div className="absolute top-3 left-4 flex items-center gap-2 z-10">
         <span className="text-xs font-mono text-text-muted uppercase tracking-widest">Attack Graph</span>
@@ -59,7 +59,7 @@ export function AttackGraph() {
       {empty ? (
         <div className="flex flex-col items-center justify-center h-full text-center gap-3 p-8">
           <div className="w-16 h-16 rounded-full border border-line/20 flex items-center justify-center">
-            <span className="text-3xl opacity-20">⬡</span>
+            <Radar className="w-7 h-7 text-accent/35" />
           </div>
           <p className="text-text-muted text-sm font-mono">
             {session ? "Waiting for first finding…" : "Configure a target and start analysis"}

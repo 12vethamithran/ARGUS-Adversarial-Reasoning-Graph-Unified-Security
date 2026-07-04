@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight, CircleAlert, ShieldCheck, Loader2 } from "lucide-react";
 import { useSessionStore } from "../../store/sessionStore";
 import { LAYER_META, describeFinding, SEVERITY_ORDER } from "../../lib/findingKb";
@@ -26,7 +27,12 @@ export function Sidebar() {
   const exploitable = Object.values(findings).filter((f) => f.exploitable).length;
 
   return (
-    <aside className="w-72 shrink-0 border-r border-line/15 bg-surface flex flex-col overflow-hidden">
+    <motion.aside
+      initial={{ opacity: 0, x: -18 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      className="argus-panel-shell w-72 shrink-0 border-r border-line/15 bg-surface flex flex-col overflow-hidden"
+    >
       <div className="px-3 py-3 border-b border-line/10">
         <p className="text-text-muted text-xs font-mono uppercase tracking-widest">Attack Layers</p>
         <p className="text-text-muted/70 text-[11px] mt-0.5">{activeLayers.length} active · {Object.keys(findings).length} findings</p>
@@ -42,7 +48,14 @@ export function Sidebar() {
           const crit = list.filter((f) => f.severity === "critical" || f.severity === "high").length;
 
           return (
-            <div key={id} className="rounded-lg border border-line/10 bg-bg/30 overflow-hidden">
+            <motion.div
+              key={id}
+              layout
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ x: 2 }}
+              className="rounded-lg border border-line/10 bg-bg/30 overflow-hidden"
+            >
               <button
                 onClick={() => setExpanded((e) => ({ ...e, [id]: !e[id] }))}
                 className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-accent/5 transition-colors"
@@ -65,8 +78,16 @@ export function Sidebar() {
                 ) : null}
               </button>
 
-              {isOpen && (
-                <div className="px-2.5 pb-2.5 pt-0.5 space-y-1.5 border-t border-line/10">
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                <motion.div
+                  key="details"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="overflow-hidden px-2.5 pb-2.5 pt-0.5 space-y-1.5 border-t border-line/10"
+                >
                   <p className="text-[10px] text-text-muted leading-relaxed pt-1.5">{meta?.description}</p>
                   {list.length === 0 ? (
                     <p className="text-[10px] font-mono text-text-muted/70 italic">
@@ -99,9 +120,10 @@ export function Sidebar() {
                       );
                     })
                   )}
-                </div>
+                </motion.div>
               )}
-            </div>
+              </AnimatePresence>
+            </motion.div>
           );
         })}
       </div>
@@ -111,7 +133,7 @@ export function Sidebar() {
         <Stat label="Exploit" value={exploitable} cls="text-severity-high" />
         <Stat label="Chains" value={chains.length} cls="text-accent" />
       </div>
-    </aside>
+    </motion.aside>
   );
 }
 

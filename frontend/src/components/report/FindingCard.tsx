@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, CircleAlert, ShieldCheck } from "lucide-react";
 import type { Finding } from "../../lib/types";
 import { describeFinding, evidenceEntries } from "../../lib/findingKb";
@@ -17,7 +18,7 @@ export function FindingCard({ finding }: { finding: Finding }) {
   const evidence = evidenceEntries(finding);
 
   return (
-    <div className="bg-raised rounded-lg border border-line/10 overflow-hidden">
+    <motion.div layout className="bg-raised rounded-lg border border-line/10 overflow-hidden">
       <button onClick={() => setOpen((o) => !o)} className="w-full text-left p-4 hover:bg-accent/5 transition-colors">
         <div className="flex items-start gap-3">
           <span className={`shrink-0 text-xs font-mono px-2 py-0.5 rounded border ${SEV_STYLES[finding.severity] ?? ""} uppercase`}>
@@ -43,8 +44,16 @@ export function FindingCard({ finding }: { finding: Finding }) {
         </div>
       </button>
 
-      {open && (
-        <div className="px-4 pb-4 pt-1 space-y-2 border-t border-line/10">
+      <AnimatePresence initial={false}>
+        {open && (
+        <motion.div
+          key="finding-details"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+          className="overflow-hidden px-4 pb-4 pt-1 space-y-2 border-t border-line/10"
+        >
           <Field label="What it is" text={d.description} />
           <Field label="Impact" text={d.impact} />
           <Field label="Remediation" text={d.remediation} />
@@ -61,9 +70,10 @@ export function FindingCard({ finding }: { finding: Finding }) {
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
-    </div>
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
