@@ -180,5 +180,5 @@ export function useForceGraph(
     void circle;
 
     return () => { sim.stop(); };
-  }, [findings, chains, onSelect]);
+  }, [findings, chains, onSelect, svgRef, controlsRef]);
 }

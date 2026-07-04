@@ -1,0 +1,25 @@
+# Secrets — never bake into the image
+.env
+.env.*
+!.env.example
+
+# Virtualenvs / local interpreters
+.venv*
+venv/
+
+# Python caches & build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Local runtime output
+data/
+*.log
+
+# VCS / tooling
+.git/
+.gitignore

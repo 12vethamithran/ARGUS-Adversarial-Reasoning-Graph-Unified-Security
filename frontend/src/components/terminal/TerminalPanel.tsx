@@ -23,11 +23,11 @@ export function TerminalPanel() {
 
       term = new Terminal({
         theme: {
-          background: "#070810", foreground: "#e2e8f0",
-          cursor: "#00e5ff", cursorAccent: "#070810",
-          selectionBackground: "rgba(0,229,255,0.2)",
-          black: "#070810", brightBlack: "#334155",
-          cyan: "#00e5ff", brightCyan: "#67e8f9",
+          background: "#050505", foreground: "#f5f5f5",
+          cursor: "#ff3d12", cursorAccent: "#050505",
+          selectionBackground: "rgba(255,61,18,0.22)",
+          black: "#050505", brightBlack: "#3a3a3a",
+          cyan: "#a8a8a8", brightCyan: "#f5f5f5",
           green: "#00e676", yellow: "#ffb300",
           red: "#ff3d57", white: "#e2e8f0",
         },
@@ -75,15 +75,16 @@ export function TerminalPanel() {
   if (mode !== "advanced") return null;
 
   return (
-    <div className="flex flex-col h-full glass rounded-lg border border-line/15 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-line/15 bg-[#0d0f1a] shrink-0">
+    <div className="argus-panel-shell flex flex-col h-full glass rounded-lg border border-line/15 overflow-hidden">
+      <div className="relative flex items-center gap-3 px-4 py-2 border-b border-line/15 bg-bg/90 shrink-0 overflow-hidden">
+        <span className="absolute inset-x-0 bottom-0 h-px argus-live-pill bg-accent/20" />
         <div className="flex gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
           <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
         </div>
-        <span className="text-xs font-mono text-slate-400">argus@target:~$</span>
-        <span className="ml-auto text-xs font-mono text-slate-600 hidden md:block">
+        <span className="text-xs font-mono text-text-secondary">argus@target:~$</span>
+        <span className="ml-auto text-xs font-mono text-text-muted hidden md:block">
           Whitelisted: nmap · curl · dig · whois · traceroute · openssl · nikto · whatweb
         </span>
       </div>

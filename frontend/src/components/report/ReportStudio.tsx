@@ -34,7 +34,7 @@ export function ReportStudio() {
   const exportBtn = "flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded border border-line/20 text-text-secondary hover:text-accent hover:border-accent/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
-    <div className="flex flex-col h-full bg-surface rounded-lg border border-line/15 overflow-hidden">
+    <div className="argus-panel-shell flex flex-col h-full bg-surface rounded-lg border border-line/15 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-line/15 shrink-0">
         <span className="text-xs font-mono text-text-muted uppercase tracking-widest">Report Studio</span>
         <div className="flex items-center gap-1.5">
@@ -104,7 +104,7 @@ export function ReportStudio() {
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-mono text-accent">Priority</span>
                   <div className="flex-1 bg-overlay rounded-full h-1.5">
-                    <div className="h-full rounded-full bg-accent transition-all duration-700" style={{ width: `${chain.priority * 100}%` }} />
+                    <div className="argus-live-pill h-full rounded-full bg-accent transition-all duration-700" style={{ width: `${chain.priority * 100}%` }} />
                   </div>
                   <span className="text-xs font-mono text-accent">{(chain.priority * 100).toFixed(0)}%</span>
                 </div>

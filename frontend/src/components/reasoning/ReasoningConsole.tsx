@@ -40,7 +40,7 @@ export function ReasoningConsole() {
   const nonEmpty = lines.filter((l) => l.trim().length > 0).length;
 
   return (
-    <div className="flex flex-col h-full bg-surface rounded-lg border border-line/15 overflow-hidden">
+    <div className="argus-panel-shell flex flex-col h-full bg-surface rounded-lg border border-line/15 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-line/10 shrink-0">
         <BrainCircuit className="w-3.5 h-3.5 text-accent" />
         <span className="text-xs font-mono text-text-muted uppercase tracking-widest">Reasoning Console</span>

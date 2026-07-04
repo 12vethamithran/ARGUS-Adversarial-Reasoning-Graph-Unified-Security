@@ -68,7 +68,7 @@ export function Onboarding({ onStart, onBack }: Props) {
       <div className="flex gap-2 mb-10">
         {(["mode", "target", "layers"] as const).map((s, i) => (
           <div key={s} className={`h-1 rounded-full transition-all duration-300 ${
-            step === s ? "w-8 bg-accent" :
+            step === s ? "w-8 argus-step-rail" :
             (["mode","target","layers"].indexOf(step) > i) ? "w-4 bg-accent/40" : "w-4 bg-line/20"
           }`} />
         ))}
@@ -83,41 +83,41 @@ export function Onboarding({ onStart, onBack }: Props) {
               <p className="text-text-secondary">Select based on your expertise and goals</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }}
+              <motion.button whileHover={{ scale:1.02, y:-2 }} whileTap={{ scale:0.98 }}
                 onClick={() => selectMode("basic")}
-                className="text-left p-6 rounded-2xl border border-sky-500/20 hover:border-sky-500/50 transition-all bg-sky-500/[0.04]">
+                className="argus-mode-card text-left p-6 rounded-2xl border border-accent/20 hover:border-accent/50 transition-all bg-accent/[0.04] hover:bg-accent/[0.07]">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-500">
+                  <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent">
                     <GraduationCap className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="font-bold text-text-primary">Basic Mode</p>
-                    <p className="text-xs text-sky-500 font-mono">3 layers · Quick assessment</p>
+                    <p className="text-xs text-accent font-mono">3 layers · Quick assessment</p>
                   </div>
                 </div>
                 <ul className="space-y-2 text-sm text-text-secondary">
                   {["Web surface scan (L1)","LLM probe + injection (L2)","RAG poisoning model (L3)","Top 3 chains + 1-page report","No config required"].map((t) => (
-                    <li key={t} className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-sky-500 shrink-0" />{t}</li>
+                    <li key={t} className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-accent shrink-0" />{t}</li>
                   ))}
                 </ul>
                 <p className="mt-4 text-xs font-mono text-text-muted">Ideal for: Students, quick assessments</p>
               </motion.button>
 
-              <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }}
+              <motion.button whileHover={{ scale:1.02, y:-2 }} whileTap={{ scale:0.98 }}
                 onClick={() => selectMode("advanced")}
-                className="text-left p-6 rounded-2xl border border-rose-500/20 hover:border-rose-500/50 transition-all bg-rose-500/[0.04]">
+                className="argus-mode-card text-left p-6 rounded-2xl border border-accent/20 hover:border-accent/50 transition-all bg-accent/[0.04] hover:bg-accent/[0.07]">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500">
+                  <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent">
                     <Crosshair className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="font-bold text-text-primary">Advanced Mode</p>
-                    <p className="text-xs text-rose-500 font-mono">8 layers · Full red team</p>
+                    <p className="text-xs text-accent font-mono">8 layers · Full red team</p>
                   </div>
                 </div>
                 <ul className="space-y-2 text-sm text-text-secondary">
                   {["All 8 attack layers (configurable)","Sandboxed in-browser terminal","Manual chain hypothesis injection","Multi-agent propagation sim","STIX 2.1 + PDF export"].map((t) => (
-                    <li key={t} className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-rose-500 shrink-0" />{t}</li>
+                    <li key={t} className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-accent shrink-0" />{t}</li>
                   ))}
                 </ul>
                 <p className="mt-4 text-xs font-mono text-text-muted">Ideal for: Red teamers, researchers</p>
@@ -164,7 +164,7 @@ export function Onboarding({ onStart, onBack }: Props) {
               <button
                 onClick={() => mode === "advanced" ? setStep("layers") : handleStart()}
                 disabled={!url && !description}
-                className={`flex-1 py-3 rounded-xl font-mono font-semibold text-sm border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${accentClass}`}>
+                className={`flex-1 py-3 rounded-xl font-mono font-semibold text-sm border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${loading ? "argus-live-pill" : ""} ${accentClass}`}>
                 {loading ? "Starting..." : mode === "basic" ? "Start Analysis" : "Next: Configure Layers"}
               </button>
             </div>
@@ -183,7 +183,10 @@ export function Onboarding({ onStart, onBack }: Props) {
                 const active = activeLayers.includes(l.id);
                 const locked = l.id <= 3;
                 return (
-                  <button key={l.id} onClick={() => toggleLayer(l.id)}
+                  <motion.button key={l.id} onClick={() => toggleLayer(l.id)}
+                    layout
+                    whileHover={locked ? undefined : { y: -2 }}
+                    whileTap={locked ? undefined : { scale: 0.98 }}
                     className={`text-left p-4 rounded-xl border transition-all duration-200 ${
                       active ? "border-accent/40 bg-accent/5" : "border-line/15 opacity-50"
                     } ${locked ? "cursor-default" : "cursor-pointer"}`}>
@@ -200,7 +203,7 @@ export function Onboarding({ onStart, onBack }: Props) {
                     </div>
                     <p className="text-xs text-text-muted ml-5">{l.desc}</p>
                     {locked && <p className="text-xs text-accent/50 ml-5 mt-1 font-mono">always on</p>}
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -210,7 +213,7 @@ export function Onboarding({ onStart, onBack }: Props) {
                 Back
               </button>
               <button onClick={handleStart} disabled={loading || activeLayers.length === 0}
-                className="flex-1 py-3 rounded-xl font-mono font-semibold text-sm border border-accent/40 text-accent bg-accent/10 hover:bg-accent/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                className={`flex-1 py-3 rounded-xl font-mono font-semibold text-sm border border-accent/40 text-accent bg-accent/10 hover:bg-accent/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${loading ? "argus-live-pill" : ""}`}>
                 {loading ? "Starting..." : `Launch ${activeLayers.length}-Layer Sweep`}
               </button>
             </div>

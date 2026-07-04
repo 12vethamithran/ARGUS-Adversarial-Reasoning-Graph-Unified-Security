@@ -11,7 +11,7 @@ const SEV_TEXT: Record<SeverityLevel, string> = {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col h-full bg-surface rounded-lg border border-line/15 overflow-hidden">
+    <div className="argus-panel-shell flex flex-col h-full bg-surface rounded-lg border border-line/15 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-line/10 shrink-0">
         <GitBranch className="w-3.5 h-3.5 text-accent" />
         <span className="text-xs font-mono text-text-muted uppercase tracking-widest">Chain Replay</span>
@@ -42,6 +42,8 @@ export function ChainReplay() {
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [playing, chain, maxStep]);
 
+  // Reset replay position when the selected chain changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setStep(0); setPlaying(false); }, [sel]);
 
   if (!chain) {
@@ -96,7 +98,7 @@ export function ChainReplay() {
                   }`}>
                   {layer ? `L${layer}` : i + 1}
                 </button>
-                {i < maxStep && <div className={`w-6 h-0.5 ${i < step ? "bg-accent/60" : "bg-line/20"}`} />}
+                {i < maxStep && <div className={`w-6 h-0.5 ${i < step ? "argus-live-pill bg-accent/60" : "bg-line/20"}`} />}
               </div>
             );
           })}
