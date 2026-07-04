@@ -5,6 +5,7 @@ import {
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
 } from "lucide-react";
 import { LiveAttackChain } from "../components/motion/LiveAttackChain";
+import { SystemReveal } from "../components/motion/SystemReveal";
 
 const ACCENTS = {
   neutral:  { a: "255 61 18", s: "217 45 10" },   // Furo orange-red
@@ -49,12 +50,6 @@ const APART = [
   { n: "01", title: "Reasons across layers", body: "Most scanners look at one domain. ARGUS correlates findings across all eight into emergent kill-chains — the attacks that only appear between tools." },
   { n: "02", title: "Built for AI threats", body: "Purpose-built for LLM, RAG, MCP/agentic and multi-agent risks. Not a web scanner with an AI checkbox bolted on." },
   { n: "03", title: "Validates in the open", body: "A sandboxed, whitelisted recon terminal to confirm findings live against the target — exploit and destructive flags blocked." },
-];
-
-const FEATURE_REVEALS = [
-  { k: "01", title: "Adversarial reasoning", body: "Cross-layer analysis that follows how one weakness becomes a campaign." },
-  { k: "02", title: "Graph-based clarity", body: "Findings, chains, and impact are mapped into a visual attack graph." },
-  { k: "03", title: "Unified security", body: "Web, LLM, RAG, MCP, identity, network, supply-chain, and agentic risk together." },
 ];
 
 // Headline whose words clip-reveal upward, one after another, on scroll into view.
@@ -211,48 +206,9 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── HERO 1: ARGUS name + feature reveal ── */}
       <header className="relative overflow-hidden px-6 md:px-10 py-16 md:py-20 min-h-[86vh] flex items-center border-b border-line/10">
-        <div className="argus-workspace-grid absolute inset-0 opacity-30" aria-hidden />
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent" aria-hidden />
         <div className="relative z-10 w-full max-w-[1600px] mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono uppercase tracking-[0.22em]"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-            Live system reveal
-          </motion.div>
-
-          <div className="mt-10 overflow-hidden">
-            <motion.h1
-              initial={{ y: "105%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-              className="halftone-text halftone-breathe text-[clamp(5.5rem,19vw,19rem)] leading-[0.78]"
-            >
-              ARGUS
-            </motion.h1>
-          </div>
-
-          <div className="mt-10 grid gap-3 md:grid-cols-3">
-            {FEATURE_REVEALS.map((item, i) => (
-              <motion.div
-                key={item.k}
-                initial={{ opacity: 0, y: 24, filter: "blur(5px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ delay: 0.45 + i * 0.12, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                className="argus-panel-shell rounded-lg border border-line/15 bg-surface/55 p-5"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-mono text-xs text-accent">{item.k}</span>
-                  <span className="h-px flex-1 bg-line/10" />
-                </div>
-                <p className="mt-5 text-lg font-semibold text-text-primary">{item.title}</p>
-                <p className="mt-2 text-sm leading-relaxed text-text-secondary">{item.body}</p>
-              </motion.div>
-            ))}
-          </div>
+          <SystemReveal />
         </div>
       </header>
 
