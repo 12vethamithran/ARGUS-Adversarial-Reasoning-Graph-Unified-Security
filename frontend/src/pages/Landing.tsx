@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { useEffect, useState, type CSSProperties } from "react";
+import { motion } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
@@ -49,6 +49,12 @@ const APART = [
   { n: "01", title: "Reasons across layers", body: "Most scanners look at one domain. ARGUS correlates findings across all eight into emergent kill-chains — the attacks that only appear between tools." },
   { n: "02", title: "Built for AI threats", body: "Purpose-built for LLM, RAG, MCP/agentic and multi-agent risks. Not a web scanner with an AI checkbox bolted on." },
   { n: "03", title: "Validates in the open", body: "A sandboxed, whitelisted recon terminal to confirm findings live against the target — exploit and destructive flags blocked." },
+];
+
+const FEATURE_REVEALS = [
+  { k: "01", title: "Adversarial reasoning", body: "Cross-layer analysis that follows how one weakness becomes a campaign." },
+  { k: "02", title: "Graph-based clarity", body: "Findings, chains, and impact are mapped into a visual attack graph." },
+  { k: "03", title: "Unified security", body: "Web, LLM, RAG, MCP, identity, network, supply-chain, and agentic risk together." },
 ];
 
 // Headline whose words clip-reveal upward, one after another, on scroll into view.
@@ -183,18 +189,8 @@ export function Landing({ onEnter }: Props) {
   const rootStyle = { "--accent": acc.a, "--accent-strong": acc.s, "--glow": acc.a } as CSSProperties;
   const clock = useClock();
 
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  // Spring-smoothed progress => buttery parallax that eases instead of snapping to scroll.
-  const sp = useSpring(scrollYProgress, { stiffness: 80, damping: 24, mass: 0.4 });
-  const heroY = useTransform(sp, [0, 1], [0, -170]);
-  const heroFade = useTransform(sp, [0, 0.55], [0.42, 0]);
-  // NOTE: we parallax only translate + opacity (both GPU-composited). A `scale`
-  // here would force the giant background-clip:text word to re-rasterize on every
-  // scroll frame — the main cause of the scroll lag — so it is intentionally gone.
-
   return (
-    <div ref={ref} className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
+    <div className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-5 border-b border-line/10 bg-bg/80 backdrop-blur-xl">
         <div className="flex items-center gap-5">
@@ -213,32 +209,78 @@ export function Landing({ onEnter }: Props) {
         </div>
       </nav>
 
-      {/* ── HERO (Furo dithered word + serif overlay) ── */}
-      <header className="relative px-6 md:px-10 pt-10 pb-20 max-w-[1600px] mx-auto min-h-[92vh] flex flex-col">
-        <motion.div style={{ y: heroY, opacity: heroFade, willChange: "transform, opacity" }} aria-hidden
-          className="absolute inset-x-4 md:inset-x-10 top-2 flex justify-between pointer-events-none select-none origin-top">
-          {"ARGUS".split("").map((ch, i) => (
-            <motion.span key={i}
-              className="halftone-text halftone-breathe text-[24vw] leading-[0.8] inline-block"
-              initial={{ y: "18%", opacity: 0 }}
+      {/* ── HERO 1: ARGUS name + feature reveal ── */}
+      <header className="relative overflow-hidden px-6 md:px-10 py-16 md:py-20 min-h-[86vh] flex items-center border-b border-line/10">
+        <div className="argus-workspace-grid absolute inset-0 opacity-30" aria-hidden />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent" aria-hidden />
+        <div className="relative z-10 w-full max-w-[1600px] mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono uppercase tracking-[0.22em]"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+            Live system reveal
+          </motion.div>
+
+          <div className="mt-10 overflow-hidden">
+            <motion.h1
+              initial={{ y: "105%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 + i * 0.09, duration: 1, ease: [0.16, 1, 0.3, 1] }}
-              whileHover={{ scale: 1.06, color: "rgb(var(--accent))" }}>
-              {ch}
-            </motion.span>
-          ))}
-        </motion.div>
-
-        {/* headline and live motion have separate desktop lanes so neither fights the brand wordmark */}
-        <div className="relative z-10 mt-auto grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] lg:items-end">
-          <div>
-            <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-              className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-4xl">
-              Security that <span className="serif-italic">sees</span><br />every attack chain.
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+              className="halftone-text halftone-breathe text-[clamp(5.5rem,19vw,19rem)] leading-[0.78]"
+            >
+              ARGUS
             </motion.h1>
+          </div>
 
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
-              className="mt-14 flex flex-wrap items-center gap-5">
+          <div className="mt-10 grid gap-3 md:grid-cols-3">
+            {FEATURE_REVEALS.map((item, i) => (
+              <motion.div
+                key={item.k}
+                initial={{ opacity: 0, y: 24, filter: "blur(5px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ delay: 0.45 + i * 0.12, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                className="argus-panel-shell rounded-lg border border-line/15 bg-surface/55 p-5"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-mono text-xs text-accent">{item.k}</span>
+                  <span className="h-px flex-1 bg-line/10" />
+                </div>
+                <p className="mt-5 text-lg font-semibold text-text-primary">{item.title}</p>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">{item.body}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* ── HERO 2: live attack-chain motion ── */}
+      <section className="relative px-6 md:px-10 py-20 md:py-24 max-w-[1600px] mx-auto">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(440px,620px)] lg:items-center">
+          <div>
+            <WordReveal
+              className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-5xl"
+              tokens={["Security", "that", { w: "sees", accent: true }, "\n", "every", "attack", "chain."]}
+            />
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ delay: 0.18, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-8 max-w-xl text-text-secondary leading-relaxed"
+            >
+              Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that
+              poisons a RAG corpus that hijacks an agent.
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ delay: 0.28, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-10 flex flex-wrap items-center gap-5"
+            >
               <button onClick={onEnter}
                 className="group flex items-center gap-3 px-7 py-4 rounded-full bg-accent text-[rgb(var(--accent-contrast))] font-medium tracking-wide hover:opacity-90 transition-all">
                 DISCOVER ARGUS <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
@@ -247,21 +289,11 @@ export function Landing({ onEnter }: Props) {
             </motion.div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 22, filter: "blur(5px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ delay: 0.62, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-[560px] lg:justify-self-end"
-          >
-            <p className="mb-5 text-text-secondary leading-relaxed max-w-md lg:ml-auto lg:text-right">
-              Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that
-              poisons a RAG corpus that hijacks an agent.
-            </p>
+          <Reveal delay={0.1}>
             <LiveAttackChain />
-          </motion.div>
+          </Reveal>
         </div>
-        {/* end hero content */}
-      </header>
+      </section>
 
       {/* ── PROBLEM BAND (normal-flow, copy staggers in on enter) ── */}
       <ProblemBand />
