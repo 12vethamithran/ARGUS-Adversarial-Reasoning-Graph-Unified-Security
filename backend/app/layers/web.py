@@ -547,7 +547,9 @@ class WebLayer(BaseLayer):
             ev = f.evidence
             key = (ev.get("url"), ev.get("param"), ev.get("family"))
             cur = best.get(key)
-            if cur is None or (f.exploitable and not cur.exploitable):
+            if cur is None or (
+                (f.exploitable, f.confidence) > (cur.exploitable, cur.confidence)
+            ):
                 best[key] = f
         return list(best.values())
 
@@ -578,7 +580,7 @@ class WebLayer(BaseLayer):
             tf_sim = wp.body_similarity(t_text, f_text)
             tb_sim = wp.body_similarity(t_text, baseline_text)
             # TRUE resembles the normal page, FALSE diverges from TRUE.
-            if tf_sim < 0.95 and tb_sim > tf_sim:
+            if tb_sim >= 0.92 and tf_sim <= 0.85:
                 ev.update({"signal": f"true≈baseline ({tb_sim:.2f}) but true≠false ({tf_sim:.2f})",
                            "verdict": "exploited"})
                 return self._inj_finding(pd, ev, exploited=True, conf=0.72)
@@ -670,11 +672,12 @@ class WebLayer(BaseLayer):
                 hit = (wp.TRAVERSAL_SIGNATURE.search(text) if pd["detect"] == "fs_signature"
                        else wp.reflects_token(text, pd.get("proof", "")))
                 if hit:
+                    signal = "filesystem content disclosed" if pd["detect"] == "fs_signature" else "proof token reflected"
                     findings.append(self._finding(
                         title=f"EXPLOITED: {pd['name']} [{pd['id']}] via '{param}'",
                         severity="high", owasp_ref=pd["owasp"], mitre_ref=pd.get("mitre"),
                         evidence={"param": param, "family": "ssrf", "technique": pd["technique"],
-                                  "snippet": text[:160], "verdict": "exploited"},
+                                  "signal": signal, "snippet": text[:160], "verdict": "exploited"},
                         exploitable=True, confidence=0.74,
                     ))
                     break

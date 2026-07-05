@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from typing import AsyncGenerator
 
+from app.engine.decision import calibrate_findings
 from app.engine.state import ArgusState
 from app.engine.scorer import score_chain
 from app.models.stream_event import StreamEvent
@@ -93,6 +94,7 @@ async def run_orchestrator(
             findings = await asyncio.wait_for(
                 layer.run(state.target, state), timeout=LAYER_TIMEOUT
             )
+            findings = calibrate_findings(findings)
         except asyncio.TimeoutError:
             yield StreamEvent.reasoning_token(f"L{layer_id} timed out after {LAYER_TIMEOUT}s.\n")
             yield StreamEvent.layer_done(layer_id, 0)

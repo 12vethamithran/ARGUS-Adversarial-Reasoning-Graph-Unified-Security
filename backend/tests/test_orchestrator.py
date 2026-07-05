@@ -25,6 +25,22 @@ class _StubLayer:
         )]
 
 
+class _WeakExploitLayer:
+    """Emits an exploitable raw finding that should be downgraded by calibration."""
+    def __init__(self, layer_id: int):
+        self.layer_id = layer_id
+
+    async def run(self, target, state):
+        return [Finding(
+            layer=self.layer_id,
+            title="Weak SQLi",
+            severity="critical",
+            exploitable=True,
+            confidence=0.85,
+            evidence={"family": "sqli", "verdict": "suspicious"},
+        )]
+
+
 def _collect(events):
     tokens = "".join(
         (e.payload or {}).get("token", "") for e in events if e.type == "reasoning_token"
@@ -74,3 +90,17 @@ async def test_runs_dependent_layer_when_prereq_exploitable(monkeypatch):
     assert "skipped" not in tokens
     # Every active layer ran and recorded completion.
     assert state.completed_layers == [1, 2, 3, 4, 7, 8]
+
+
+@pytest.mark.asyncio
+async def test_calibration_prevents_weak_findings_unlocking_deps(monkeypatch):
+    monkeypatch.setattr(orch, "_import_layer", lambda lid: _WeakExploitLayer(lid))
+    state = ArgusState(session_id="t", mode="advanced", target={},
+                       active_layers=[2, 3])
+    events = await _drive(state)
+    tokens, _ = _collect(events)
+
+    assert "L3 (RAG Poisoning) skipped" in tokens
+    l2_findings = [f for f in state.findings.values() if f.layer == 2]
+    assert l2_findings and not l2_findings[0].exploitable
+    assert l2_findings[0].evidence["decision"]["adjusted"]
