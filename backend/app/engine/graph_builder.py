@@ -1,11 +1,11 @@
 """Build NetworkX DiGraph from findings + chains; serialize to D3 JSON."""
 from __future__ import annotations
 import json
-import pickle
 from pathlib import Path
 from typing import Any
 
 import networkx as nx
+from networkx.readwrite import json_graph
 
 from app.models.finding import Finding
 from app.models.chain import Chain
@@ -75,18 +75,18 @@ def to_d3(G: nx.DiGraph) -> dict[str, Any]:
 
 
 def persist_graph(G: nx.DiGraph, path: Path) -> None:
-    """Persist graph as gpickle."""
+    """Persist graph as JSON node-link data."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "wb") as fh:
-        pickle.dump(G, fh)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(json_graph.node_link_data(G, edges="links"), fh)
 
 
 def load_graph(path: Path) -> nx.DiGraph | None:
     """Load persisted graph; return None if not found."""
     if not path.exists():
         return None
-    with open(path, "rb") as fh:
-        return pickle.load(fh)
+    with open(path, encoding="utf-8") as fh:
+        return json_graph.node_link_graph(json.load(fh), edges="links")
 
 
 def graph_to_json(G: nx.DiGraph) -> str:

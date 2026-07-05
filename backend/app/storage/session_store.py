@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,15 @@ from typing import Any
 import aiofiles
 
 from app.config import settings
+
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def validate_session_id(session_id: str) -> str:
+    """Return a safe session id or raise if it cannot be used as a filename."""
+    if not _SESSION_ID_RE.fullmatch(session_id or ""):
+        raise ValueError("Invalid session id")
+    return session_id
 
 
 def _sessions_dir() -> Path:
@@ -45,12 +55,17 @@ async def _atomic_write(path: Path, data: str) -> None:
 # ── Session ──────────────────────────────────────────────────────────────────
 
 async def save_session(session_id: str, data: dict[str, Any]) -> None:
+    session_id = validate_session_id(session_id)
     data["_saved_at"] = time.time()
     path = _sessions_dir() / f"{session_id}.json"
     await _atomic_write(path, json.dumps(data, default=str))
 
 
 async def load_session(session_id: str) -> dict[str, Any] | None:
+    try:
+        session_id = validate_session_id(session_id)
+    except ValueError:
+        return None
     path = _sessions_dir() / f"{session_id}.json"
     if not path.exists():
         return None
@@ -66,6 +81,10 @@ async def list_sessions() -> list[str]:
 
 
 async def delete_session(session_id: str) -> None:
+    try:
+        session_id = validate_session_id(session_id)
+    except ValueError:
+        return
     for d, ext in [
         (_sessions_dir(), ".json"),
         (_graphs_dir(), ".gpickle"),
@@ -82,11 +101,16 @@ async def delete_session(session_id: str) -> None:
 # ── Chain cache ───────────────────────────────────────────────────────────────
 
 async def save_chains(session_id: str, chains: list[dict]) -> None:
+    session_id = validate_session_id(session_id)
     path = _cache_dir() / f"{session_id}_chains.json"
     await _atomic_write(path, json.dumps(chains, default=str))
 
 
 async def load_chains(session_id: str) -> list[dict] | None:
+    try:
+        session_id = validate_session_id(session_id)
+    except ValueError:
+        return None
     path = _cache_dir() / f"{session_id}_chains.json"
     if not path.exists():
         return None
@@ -97,6 +121,7 @@ async def load_chains(session_id: str) -> list[dict] | None:
 # ── Audit log ─────────────────────────────────────────────────────────────────
 
 async def append_audit(session_id: str, entry: dict[str, Any]) -> None:
+    session_id = validate_session_id(session_id)
     path = _logs_dir() / f"{session_id}_audit.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps({**entry, "ts": time.time()}, default=str) + "\n"
@@ -105,6 +130,10 @@ async def append_audit(session_id: str, entry: dict[str, Any]) -> None:
 
 
 async def load_audit(session_id: str) -> list[dict]:
+    try:
+        session_id = validate_session_id(session_id)
+    except ValueError:
+        return []
     path = _logs_dir() / f"{session_id}_audit.jsonl"
     if not path.exists():
         return []

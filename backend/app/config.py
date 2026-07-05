@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 24
     rate_limit: str = "60/minute"
     log_level: str = "INFO"
+    scanner_verify_tls: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

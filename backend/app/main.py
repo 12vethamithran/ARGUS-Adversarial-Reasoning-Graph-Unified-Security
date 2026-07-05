@@ -49,8 +49,8 @@ app.add_middleware(
     allow_origins=_origins,
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if not _wildcard else None,
     allow_credentials=not _wildcard,  # credentials + wildcard is rejected by browsers
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     expose_headers=["X-Session-Id"],
 )
 

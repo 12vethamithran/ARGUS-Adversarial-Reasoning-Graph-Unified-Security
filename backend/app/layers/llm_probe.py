@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from app.config import settings
 from app.layers.base import BaseLayer
 from app.engine.target_profile import jitter
 from app.models.finding import Finding
@@ -293,7 +294,7 @@ class LLMProbeLayer(BaseLayer):
             base = url.split("#", 1)[0]
             sep = "&" if "?" in base else "?"
             probe = f"{base}{sep}{param}={proof}"
-            async with httpx.AsyncClient(timeout=httpx.Timeout(6.0), verify=False,
+            async with httpx.AsyncClient(timeout=httpx.Timeout(6.0), verify=settings.scanner_verify_tls,
                                          follow_redirects=True) as client:
                 r = await client.get(probe)
             return proof in r.text
@@ -304,7 +305,7 @@ class LLMProbeLayer(BaseLayer):
     async def _discover_endpoint(self, base_url: str) -> tuple[str | None, str | None, str | None]:
         base = base_url.rstrip("/")
         probe_prompt = f"Reply with only this exact token: {DISCOVERY_CANARY}"
-        async with httpx.AsyncClient(timeout=httpx.Timeout(6.0), verify=False,
+        async with httpx.AsyncClient(timeout=httpx.Timeout(6.0), verify=settings.scanner_verify_tls,
                                      follow_redirects=True) as client:
             for path in LLM_ENDPOINT_PATHS:
                 full = base + path
@@ -331,7 +332,7 @@ class LLMProbeLayer(BaseLayer):
     async def _probe_endpoint(self, target: dict, endpoint: str,
                               working_schema: str | None) -> list[Finding]:
         findings: list[Finding] = []
-        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0), verify=False) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0), verify=settings.scanner_verify_tls) as client:
             for pd in INJECTION_PAYLOADS:
                 schemas = _schemas(pd["payload"])
                 if working_schema:  # prefer the schema discovery already validated

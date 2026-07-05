@@ -38,3 +38,14 @@ async def test_ttl_respects_configured_hours(tmp_path, monkeypatch):
     os.utime(p, (stale, stale))
 
     assert await session_store.ttl_janitor() == 1
+
+
+@pytest.mark.asyncio
+async def test_session_id_rejects_path_traversal(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.config.settings.data_dir", str(tmp_path))
+
+    with pytest.raises(ValueError):
+        await session_store.save_session("../escape", {"id": "../escape"})
+
+    assert await session_store.load_session("../escape") is None
+    assert not (tmp_path.parent / "escape.json").exists()

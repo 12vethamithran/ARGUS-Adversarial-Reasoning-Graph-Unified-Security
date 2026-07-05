@@ -9,6 +9,7 @@ from typing import Any
 import aiofiles
 
 from app.config import settings
+from app.storage.session_store import validate_session_id
 
 _TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
 _REPORTS_DIR_FUNC = lambda: Path(settings.data_dir) / "reports"
@@ -28,6 +29,7 @@ def _render_html(context: dict[str, Any]) -> str:
 
 async def write_html_report(session_id: str, context: dict[str, Any]) -> Path:
     """Render and persist HTML report. Returns path."""
+    session_id = validate_session_id(session_id)
     html = _render_html(context)
     out = _REPORTS_DIR_FUNC() / f"{session_id}_report.html"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -38,6 +40,7 @@ async def write_html_report(session_id: str, context: dict[str, Any]) -> Path:
 
 async def write_pdf_report(session_id: str, context: dict[str, Any]) -> Path:
     """Render HTML and convert to PDF via weasyprint. Returns path."""
+    session_id = validate_session_id(session_id)
     try:
         from weasyprint import HTML as WPHtml
     except ImportError:

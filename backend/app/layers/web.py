@@ -28,6 +28,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
 
+from app.config import settings
 from app.layers.base import BaseLayer
 from app.layers import web_payloads as wp
 from app.models.finding import Finding
@@ -240,7 +241,7 @@ class WebLayer(BaseLayer):
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(connect=5.0, read=8.0, write=5.0, pool=5.0),
                 follow_redirects=True,
-                verify=False,
+                verify=settings.scanner_verify_tls,
                 headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
             ) as client:
                 resp = await client.get(url)
@@ -422,7 +423,7 @@ class WebLayer(BaseLayer):
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(connect=4.0, read=max(wp.MAX_TIME_BASED_DELAY + 4.0, 8.0),
                                   write=4.0, pool=4.0),
-            verify=False, follow_redirects=True,
+            verify=settings.scanner_verify_tls, follow_redirects=True,
             limits=httpx.Limits(max_connections=MAX_CONNECTIONS),
             headers={"User-Agent": "Mozilla/5.0 (ARGUS-Scanner/0.1)"},
         ) as client:
