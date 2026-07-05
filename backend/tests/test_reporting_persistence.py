@@ -53,6 +53,11 @@ async def test_persist_then_build_report_context(tmp_path, monkeypatch):
     assert "Tool-call hijack" in [f["title"] for f in ctx["findings"]]
     assert ctx["counts"]["critical"] == 2
     assert ctx["top_chain"]["priority"] == 0.86
+    assert ctx["risk_score"] >= 80
+    assert ctx["risk_rating"] == "CRITICAL"
+    assert ctx["chains"][0]["step_findings"][0]["title"] == "Indirect prompt injection"
+    assert ctx["findings"][0]["confidence_pct"] == 90
+    assert ctx["layer_summary"][1]["name"] == "LLM Probe"
 
 
 @pytest.mark.asyncio

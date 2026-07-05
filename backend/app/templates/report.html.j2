@@ -2,342 +2,354 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ARGUS Threat Report — {{ session_id[:8] }}</title>
+<title>ARGUS Analyst Report - {{ session_id[:8] }}</title>
 <style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-right {
+      content: "ARGUS - Page " counter(page) " of " counter(pages);
+      color: #667085;
+      font-size: 9px;
+    }
+  }
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --border: #30363d;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --cyan: #00d4ff;
-    --critical: #ef4444;
-    --high: #f97316;
-    --medium: #f59e0b;
-    --low: #3b82f6;
-    --info: #6b7280;
+    --ink: #111827;
+    --muted: #667085;
+    --line: #d0d5dd;
+    --panel: #f8fafc;
+    --blue: #0b5cad;
+    --critical: #b42318;
+    --high: #c2410c;
+    --medium: #b7791f;
+    --low: #175cd3;
+    --info: #475467;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    line-height: 1.6;
-    padding: 40px;
+    color: var(--ink);
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.45;
+    margin: 0;
   }
-  /* Header */
-  .header {
+  h1, h2, h3 { margin: 0; }
+  h1 { font-size: 28px; letter-spacing: 0.04em; }
+  h2 {
+    border-bottom: 1px solid var(--line);
+    color: var(--blue);
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    margin: 20px 0 10px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+  }
+  h3 { font-size: 12px; margin-bottom: 6px; }
+  p { margin: 0 0 8px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td {
+    border-bottom: 1px solid #eaecf0;
+    padding: 6px 7px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    color: #344054;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .cover {
+    border-bottom: 4px solid var(--blue);
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    border-bottom: 2px solid var(--cyan);
-    padding-bottom: 20px;
-    margin-bottom: 32px;
+    padding-bottom: 18px;
   }
-  .logo { font-family: monospace; font-size: 28px; font-weight: 700; color: var(--cyan); letter-spacing: 4px; }
-  .logo span { color: var(--text); }
-  .meta { text-align: right; color: var(--muted); font-size: 12px; }
-  .meta strong { color: var(--text); }
-  /* Section */
-  h2 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--cyan);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin: 28px 0 12px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-  /* Summary grid */
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
-    margin-bottom: 28px;
-  }
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+  .brand { color: var(--blue); font-family: Consolas, monospace; font-weight: 700; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .meta { color: var(--muted); font-size: 10px; text-align: right; }
+  .meta strong { color: var(--ink); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
     border-radius: 6px;
-    padding: 16px;
+    margin-bottom: 10px;
+    padding: 11px;
+  }
+  .grid-2 { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .grid-3 { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); }
+  .grid-5 { display: grid; gap: 7px; grid-template-columns: repeat(5, 1fr); }
+  .metric {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .metric .value { font-family: Consolas, monospace; font-size: 21px; font-weight: 700; }
+  .metric .label { color: var(--muted); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .risk {
+    align-items: center;
+    display: flex;
+    gap: 14px;
+  }
+  .risk-score {
+    border: 4px solid var(--blue);
+    border-radius: 50%;
+    font-family: Consolas, monospace;
+    font-size: 28px;
+    font-weight: 700;
+    height: 82px;
+    line-height: 74px;
     text-align: center;
+    width: 82px;
   }
-  .stat-card .num { font-size: 28px; font-weight: 700; font-family: monospace; }
-  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
-  .stat-card.critical .num { color: var(--critical); }
-  .stat-card.high .num { color: var(--high); }
-  .stat-card.medium .num { color: var(--medium); }
-  .stat-card.low .num { color: var(--low); }
-  .stat-card.info .num { color: var(--info); }
-  /* Target info */
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .info-item { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
-  .info-item .key { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
-  .info-item .val { font-family: monospace; color: var(--text); word-break: break-all; }
-  /* Severity badge */
   .badge {
-    display: inline-block;
-    padding: 2px 8px;
+    border: 1px solid currentColor;
     border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
+    display: inline-block;
+    font-family: Consolas, monospace;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
     text-transform: uppercase;
-    font-family: monospace;
   }
-  .badge.critical { background: #3b0000; color: var(--critical); border: 1px solid var(--critical); }
-  .badge.high { background: #3b1500; color: var(--high); border: 1px solid var(--high); }
-  .badge.medium { background: #3b2a00; color: var(--medium); border: 1px solid var(--medium); }
-  .badge.low { background: #001a3b; color: var(--low); border: 1px solid var(--low); }
-  .badge.info { background: #1a1d23; color: var(--info); border: 1px solid var(--info); }
-  /* Finding card */
-  .finding-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+  .critical { color: var(--critical); }
+  .high { color: var(--high); }
+  .medium { color: var(--medium); }
+  .low { color: var(--low); }
+  .info { color: var(--info); }
+  .small { color: var(--muted); font-size: 9px; }
+  .mono { font-family: Consolas, monospace; }
+  .break { word-break: break-word; }
+  .chain, .finding {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--blue);
     border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 12px;
-    border-left: 3px solid var(--border);
+    margin-bottom: 10px;
+    padding: 10px;
+    page-break-inside: avoid;
   }
-  .finding-card.critical { border-left-color: var(--critical); }
-  .finding-card.high { border-left-color: var(--high); }
-  .finding-card.medium { border-left-color: var(--medium); }
-  .finding-card.low { border-left-color: var(--low); }
-  .finding-card.info { border-left-color: var(--info); }
-  .finding-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .finding-title { font-weight: 600; flex: 1; }
-  .finding-refs { font-size: 11px; color: var(--muted); font-family: monospace; }
-  .finding-refs span { margin-right: 8px; }
-  .layer-tag {
-    font-size: 10px;
-    font-family: monospace;
-    background: #0d1b2a;
-    color: var(--cyan);
-    border: 1px solid var(--cyan);
-    border-radius: 3px;
-    padding: 1px 6px;
+  .finding.critical { border-left-color: var(--critical); }
+  .finding.high { border-left-color: var(--high); }
+  .finding.medium { border-left-color: var(--medium); }
+  .finding.low { border-left-color: var(--low); }
+  .finding.info { border-left-color: var(--info); }
+  .chain-path {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 8px 0;
   }
-  .confidence-bar {
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 8px;
+  .step {
+    background: #eef4ff;
+    border: 1px solid #b2ccff;
+    border-radius: 4px;
+    color: #1849a9;
+    font-family: Consolas, monospace;
+    font-size: 9px;
+    padding: 3px 5px;
+  }
+  .scorebar {
+    background: #eaecf0;
+    border-radius: 999px;
+    height: 6px;
+    margin-top: 3px;
     overflow: hidden;
   }
-  .confidence-bar .fill { height: 100%; background: var(--cyan); }
-  /* Chain card */
-  .chain-card {
-    background: var(--surface);
-    border: 1px solid var(--cyan);
-    border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 16px;
+  .scorebar > span { background: var(--blue); display: block; height: 100%; }
+  .evidence {
+    background: #fcfcfd;
+    border: 1px solid #eaecf0;
+    border-radius: 5px;
+    margin-top: 8px;
+    padding: 7px;
   }
-  .chain-narrative { color: var(--text); margin-bottom: 12px; font-style: italic; }
-  .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-  .score-item { text-align: center; }
-  .score-item .score-val { font-family: monospace; font-size: 18px; font-weight: 700; color: var(--cyan); }
-  .score-item .score-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-  /* Remediation */
-  .remediation-list { list-style: none; }
-  .remediation-list li {
-    padding: 8px 12px;
-    border-left: 2px solid var(--cyan);
-    margin-bottom: 6px;
-    background: #0d1b2a;
-    border-radius: 0 4px 4px 0;
-    font-size: 12px;
+  .evidence-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 110px 1fr;
+    margin-bottom: 4px;
   }
-  .remediation-list li .ref { color: var(--cyan); font-family: monospace; margin-right: 8px; font-size: 11px; }
-  /* Terminal audit */
-  .audit-entry {
-    font-family: monospace;
-    font-size: 11px;
-    padding: 4px 0;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    gap: 12px;
-  }
-  .audit-entry .ts { color: var(--muted); min-width: 160px; }
-  .audit-entry .cmd { color: var(--text); flex: 1; }
-  .audit-entry .status-allow { color: #22c55e; }
-  .audit-entry .status-block { color: var(--critical); }
-  /* Footer */
-  .footer {
-    margin-top: 40px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    text-align: center;
+  .footer-note {
+    border-top: 1px solid var(--line);
     color: var(--muted);
-    font-size: 11px;
-    font-family: monospace;
-  }
-  @media print {
-    body { background: white; color: black; padding: 20px; }
-    :root { --bg: white; --surface: #f8f9fa; --text: #000; --muted: #666; --border: #ddd; }
+    font-size: 9px;
+    margin-top: 18px;
+    padding-top: 8px;
   }
 </style>
 </head>
 <body>
-
-<!-- ── HEADER ───────────────────────────────────────────────── -->
-<div class="header">
+<section class="cover">
   <div>
-    <div class="logo">ARG<span>US</span></div>
-    <div style="color: var(--muted); font-size: 11px; margin-top: 4px;">
-      Adversarial Reasoning &amp; Graph-based Unified Security Framework
-    </div>
+    <h1 class="brand">ARGUS</h1>
+    <div class="subtitle">Analyst Threat Report - Vulnerability Severity and Attack Chain Overview</div>
   </div>
   <div class="meta">
-    <div><strong>Session ID:</strong> {{ session_id }}</div>
+    <div><strong>Session:</strong> {{ session_id }}</div>
     <div><strong>Generated:</strong> {{ generated_at }}</div>
-    <div><strong>Total Findings:</strong> {{ total_findings }} ({{ exploitable_count }} exploitable)</div>
-    <div><strong>Attack Chains:</strong> {{ chains | length }}</div>
+    <div><strong>Mode:</strong> {{ target.mode | default("unknown") }}</div>
   </div>
-</div>
+</section>
 
-<!-- ── TARGET ───────────────────────────────────────────────── -->
-<h2>Target</h2>
-<div class="info-grid">
-  {% if target.url %}
-  <div class="info-item"><div class="key">URL</div><div class="val">{{ target.url }}</div></div>
-  {% endif %}
-  {% if target.llm_endpoint %}
-  <div class="info-item"><div class="key">LLM Endpoint</div><div class="val">{{ target.llm_endpoint }}</div></div>
-  {% endif %}
-  {% if target.description %}
-  <div class="info-item"><div class="key">Description</div><div class="val">{{ target.description }}</div></div>
-  {% endif %}
-  {% if target.mode %}
-  <div class="info-item"><div class="key">Analysis Mode</div><div class="val">{{ target.mode | upper }}</div></div>
-  {% endif %}
-</div>
-
-<!-- ── SEVERITY SUMMARY ─────────────────────────────────────── -->
-<h2>Finding Summary</h2>
-<div class="summary-grid">
-  <div class="stat-card critical">
-    <div class="num">{{ counts.critical }}</div>
-    <div class="label">Critical</div>
-  </div>
-  <div class="stat-card high">
-    <div class="num">{{ counts.high }}</div>
-    <div class="label">High</div>
-  </div>
-  <div class="stat-card medium">
-    <div class="num">{{ counts.medium }}</div>
-    <div class="label">Medium</div>
-  </div>
-  <div class="stat-card low">
-    <div class="num">{{ counts.low }}</div>
-    <div class="label">Low</div>
-  </div>
-  <div class="stat-card info">
-    <div class="num">{{ counts.info }}</div>
-    <div class="label">Info</div>
-  </div>
-</div>
-
-<!-- ── ATTACK CHAINS ─────────────────────────────────────────── -->
-{% if chains %}
-<h2>Attack Chains</h2>
-{% for chain in chains %}
-<div class="chain-card">
-  <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-    <strong style="font-family:monospace; color:var(--cyan);">Chain {{ loop.index }}: {{ chain.id[:8] }}</strong>
-    {% if chain.priority >= 0.8 %}
-    <span class="badge critical">Priority: {{ "%.2f"|format(chain.priority) }}</span>
-    {% elif chain.priority >= 0.6 %}
-    <span class="badge high">Priority: {{ "%.2f"|format(chain.priority) }}</span>
+<h2>Executive Overview</h2>
+<div class="panel risk">
+  <div class="risk-score">{{ risk_score }}</div>
+  <div>
+    <h3>Overall analyst rating: <span class="badge {{ risk_rating | lower }}">{{ risk_rating }}</span></h3>
+    <p>{{ analyst_verdict }}</p>
+    {% if top_chain %}
+    <p><strong>Top chain:</strong> {{ top_chain.rating }} at {{ top_chain.priority_pct }}% priority across {{ top_chain.step_findings | length }} step(s).</p>
     {% else %}
-    <span class="badge medium">Priority: {{ "%.2f"|format(chain.priority) }}</span>
+    <p><strong>Top chain:</strong> No exploit chain was generated for this analysis.</p>
     {% endif %}
+    <p class="small">Risk score weights maximum severity, confirmed exploitability, and affected-layer breadth. Confidence and decision evidence are shown per finding.</p>
   </div>
-  <p class="chain-narrative">"{{ chain.narrative }}"</p>
-  <div class="score-grid">
-    <div class="score-item">
-      <div class="score-val">{{ "%.2f"|format(chain.exploitability) }}</div>
-      <div class="score-label">Exploitability</div>
-    </div>
-    <div class="score-item">
-      <div class="score-val">{{ "%.2f"|format(chain.impact) }}</div>
-      <div class="score-label">Impact</div>
-    </div>
-    <div class="score-item">
-      <div class="score-val">{{ "%.2f"|format(chain.novelty) }}</div>
-      <div class="score-label">Novelty</div>
-    </div>
-    <div class="score-item">
-      <div class="score-val">{{ chain.steps | length }}</div>
-      <div class="score-label">Steps</div>
-    </div>
+</div>
+
+<div class="grid-3">
+  <div class="metric"><div class="value">{{ total_findings }}</div><div class="label">Total findings</div></div>
+  <div class="metric"><div class="value">{{ exploitable_count }}</div><div class="label">Exploitable</div></div>
+  <div class="metric"><div class="value">{{ chains | length }}</div><div class="label">Attack chains</div></div>
+</div>
+
+<h2>Target Context</h2>
+<div class="panel">
+  <table>
+    <tbody>
+      {% if target.url %}<tr><th>URL</th><td class="mono break">{{ target.url }}</td></tr>{% endif %}
+      {% if target.llm_endpoint %}<tr><th>LLM endpoint</th><td class="mono break">{{ target.llm_endpoint }}</td></tr>{% endif %}
+      {% if target.description %}<tr><th>Description</th><td>{{ target.description }}</td></tr>{% endif %}
+      <tr><th>Domains hit</th><td>{{ domains_hit | join(", ") if domains_hit else "None" }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Severity Distribution</h2>
+<div class="grid-5">
+  <div class="metric"><div class="value critical">{{ counts.critical }}</div><div class="label">Critical</div></div>
+  <div class="metric"><div class="value high">{{ counts.high }}</div><div class="label">High</div></div>
+  <div class="metric"><div class="value medium">{{ counts.medium }}</div><div class="label">Medium</div></div>
+  <div class="metric"><div class="value low">{{ counts.low }}</div><div class="label">Low</div></div>
+  <div class="metric"><div class="value info">{{ counts.info }}</div><div class="label">Info</div></div>
+</div>
+
+<h2>Layer Coverage</h2>
+<table>
+  <thead>
+    <tr><th>Layer</th><th>Domain</th><th>Findings</th><th>Exploitable</th><th>Highest signal</th></tr>
+  </thead>
+  <tbody>
+    {% for row in layer_summary %}
+    <tr>
+      <td>L{{ row.layer }} - {{ row.name }}</td>
+      <td>{{ row.domain }}</td>
+      <td>{{ row.count }}</td>
+      <td>{{ row.exploitable }}</td>
+      <td>{% if row.highest %}<span class="badge {{ row.highest.severity }}">{{ row.highest.severity }}</span> {{ row.highest.title }}{% else %}<span class="small">No finding</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if chains %}
+<h2>Attack Chain Walkthrough</h2>
+{% for chain in chains %}
+<section class="chain">
+  <div style="display:flex; justify-content:space-between; gap:10px;">
+    <h3>Chain {{ loop.index }} - {{ chain.rating }}</h3>
+    <span class="badge {{ 'critical' if chain.priority >= 0.85 else 'high' if chain.priority >= 0.70 else 'medium' }}">{{ chain.priority_pct }}% priority</span>
+  </div>
+  <p>{{ chain.narrative }}</p>
+  <div class="chain-path">
+    {% for f in chain.step_findings %}
+    <span class="step">L{{ f.layer }} {{ f.layer_name }} - {{ f.severity | upper }}</span>
+    {% endfor %}
+  </div>
+  <div class="grid-3">
+    <div><strong>Exploitability</strong><div class="scorebar"><span style="width: {{ chain.exploitability_pct }}%"></span></div><span class="small">{{ chain.exploitability_pct }}%</span></div>
+    <div><strong>Impact</strong><div class="scorebar"><span style="width: {{ chain.impact_pct }}%"></span></div><span class="small">{{ chain.impact_pct }}%</span></div>
+    <div><strong>Novelty</strong><div class="scorebar"><span style="width: {{ chain.novelty_pct }}%"></span></div><span class="small">{{ chain.novelty_pct }}%</span></div>
   </div>
   {% if chain.remediations %}
-  <div style="margin-top:8px;"><strong style="font-size:12px; color:var(--muted); text-transform:uppercase;">Remediations</strong></div>
-  <ul class="remediation-list" style="margin-top:8px;">
-    {% for r in chain.remediations %}
-    <li>
-      <span class="ref">{{ r.ref }}</span>
-      L{{ r.layer }}: {{ r.action }}
-    </li>
+  <h3 style="margin-top:10px;">Chain Breakpoints</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>Action</th><th>Reference</th></tr></thead>
+    <tbody>
+      {% for r in chain.remediations %}
+      <tr><td>L{{ r.layer }}</td><td>{{ r.action }}</td><td class="mono">{{ r.ref }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+{% endif %}
+
+<h2>Finding Detail and Analyst Rating</h2>
+{% for f in findings %}
+<section class="finding {{ f.severity }}">
+  <div style="display:flex; justify-content:space-between; gap:10px;">
+    <h3>{{ f.title }}</h3>
+    <span class="badge {{ f.severity }}">{{ f.severity }}</span>
+  </div>
+  <table>
+    <tbody>
+      <tr><th>Layer</th><td>L{{ f.layer }} - {{ f.layer_name }} ({{ f.layer_domain }})</td></tr>
+      <tr><th>Rating rationale</th><td>{{ f.severity_rationale }}</td></tr>
+      <tr><th>Confidence</th><td>{{ f.confidence_pct }}%<div class="scorebar"><span style="width: {{ f.confidence_pct }}%"></span></div></td></tr>
+      <tr><th>Decision</th><td>{% if f.decision_reason %}{{ f.decision_strength | title }} - {{ f.decision_reason }}{% else %}Layer reported finding; no central decision note recorded.{% endif %}</td></tr>
+      <tr><th>References</th><td>{% if f.owasp_ref %}<span class="mono">{{ f.owasp_ref }}</span>{% endif %}{% if f.mitre_ref %} <span class="mono">{{ f.mitre_ref }}</span>{% endif %}</td></tr>
+    </tbody>
+  </table>
+  {% if f.evidence_items %}
+  <div class="evidence">
+    <h3>Evidence</h3>
+    {% for item in f.evidence_items %}
+    <div class="evidence-row"><div class="small mono">{{ item.key }}</div><div class="break">{{ item.value }}</div></div>
     {% endfor %}
-  </ul>
+  </div>
+  {% endif %}
+</section>
+{% else %}
+<p class="small">No findings recorded.</p>
+{% endfor %}
+
+<h2>Remediation Priority Plan</h2>
+<div class="panel">
+  {% if chains and top_chain and top_chain.remediations %}
+  <p><strong>Start with the top chain.</strong> Breaking any early step in the highest-priority chain can reduce total exploitability fastest.</p>
+  <table>
+    <thead><tr><th>Priority</th><th>Layer</th><th>Action</th><th>Reference</th></tr></thead>
+    <tbody>
+      {% for r in top_chain.remediations %}
+      <tr><td>{{ loop.index }}</td><td>L{{ r.layer }}</td><td>{{ r.action }}</td><td class="mono">{{ r.ref }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No chain remediation plan was generated. Triage critical and high exploitable findings first, then address medium hardening issues.</p>
   {% endif %}
 </div>
-{% endfor %}
-{% endif %}
 
-<!-- ── FINDINGS ──────────────────────────────────────────────── -->
-<h2>All Findings ({{ total_findings }})</h2>
-{% for f in findings %}
-<div class="finding-card {{ f.severity }}">
-  <div class="finding-header">
-    <span class="badge {{ f.severity }}">{{ f.severity }}</span>
-    <span class="layer-tag">L{{ f.layer }}</span>
-    <span class="finding-title">{{ f.title }}</span>
-    {% if f.exploitable %}
-    <span class="badge critical" style="font-size:10px;">⚡ EXPLOITABLE</span>
-    {% endif %}
-  </div>
-  <div class="finding-refs">
-    {% if f.owasp_ref %}<span>📋 {{ f.owasp_ref }}</span>{% endif %}
-    {% if f.mitre_ref %}<span>🎯 {{ f.mitre_ref }}</span>{% endif %}
-    <span style="float:right; font-size:11px;">Confidence: {{ "%.0f"|format(f.confidence * 100) }}%</span>
-  </div>
-  <div class="confidence-bar">
-    <div class="fill" style="width: {{ (f.confidence * 100)|int }}%;"></div>
-  </div>
-</div>
-{% else %}
-<p style="color:var(--muted); font-style:italic;">No findings recorded.</p>
-{% endfor %}
-
-<!-- ── TERMINAL AUDIT LOG ─────────────────────────────────────── -->
 {% if audit_log %}
-<h2>Terminal Activity Audit</h2>
-<div style="background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px;">
-  {% for entry in audit_log %}
-  <div class="audit-entry">
-    <span class="ts">{{ entry.ts | default('') }}</span>
-    <span class="cmd">{{ entry.command | default('') }}</span>
-    {% if entry.status == 'allowed' %}
-    <span class="status-allow">✓ ALLOWED</span>
-    {% else %}
-    <span class="status-block">✗ BLOCKED</span>
-    {% endif %}
-  </div>
-  {% endfor %}
-</div>
+<h2>Terminal Validation Audit</h2>
+<table>
+  <thead><tr><th>Timestamp</th><th>Command</th><th>Status</th><th>Reason</th></tr></thead>
+  <tbody>
+    {% for entry in audit_log %}
+    <tr>
+      <td class="mono">{{ entry.ts | default("") }}</td>
+      <td class="mono break">{{ entry.command | default("") }}</td>
+      <td>{{ entry.status | default("") }}</td>
+      <td>{{ entry.reason | default("") }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endif %}
 
-<!-- ── FOOTER ─────────────────────────────────────────────────── -->
-<div class="footer">
-  ARGUS v0.1.0 · Powered by Gemini Flash Reasoning ·
-  Session {{ session_id }} · {{ generated_at }} ·
-  ETHICS: This report describes authorized security assessment findings only.
+<div class="footer-note">
+  ARGUS v0.1.0 - This report is intended for authorized security assessment. Validate high-impact findings before production remediation or disclosure.
 </div>
-
 </body>
 </html>

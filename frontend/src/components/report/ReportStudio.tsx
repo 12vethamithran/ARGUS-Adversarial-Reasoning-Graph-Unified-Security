@@ -41,8 +41,8 @@ export function ReportStudio() {
           <button disabled={!canExport} className={exportBtn} onClick={() => guard(() => openHtmlReport(session!.id))} title="Open HTML report">
             <FileText className="w-3.5 h-3.5" /> HTML
           </button>
-          <button disabled={!canExport} className={exportBtn} onClick={() => guard(() => downloadPdfReport(session!.id))} title="Download PDF report">
-            <FileDown className="w-3.5 h-3.5" /> PDF
+          <button disabled={!canExport} className={exportBtn} onClick={() => guard(() => downloadPdfReport(session!.id))} title="Download full analyst PDF report">
+            <FileDown className="w-3.5 h-3.5" /> Analyst PDF
           </button>
           <button disabled={!canExport} className={exportBtn} onClick={() => guard(() => downloadStixReport(session!.id))} title="Download STIX 2.1 JSON">
             <Braces className="w-3.5 h-3.5" /> STIX

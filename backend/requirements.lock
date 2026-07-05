@@ -36,7 +36,9 @@ cffi==2.0.0
     #   cryptography
     #   weasyprint
 charset-normalizer==3.4.7
-    # via requests
+    # via
+    #   reportlab
+    #   requests
 click==8.4.1
     # via
     #   uvicorn
@@ -193,7 +195,9 @@ packaging==26.2
     #   pip-requirements-parser
     #   transformers
 pillow==12.2.0
-    # via weasyprint
+    # via
+    #   reportlab
+    #   weasyprint
 pip-api==0.0.34
     # via pip-audit
 pip-audit==2.10.0
@@ -277,6 +281,8 @@ requests==2.34.2
     #   requests-toolbelt
 requests-toolbelt==1.0.0
     # via langsmith
+reportlab==4.5.1
+    # via argus-backend (pyproject.toml)
 rich==15.0.0
     # via pip-audit
 scapy==2.7.0

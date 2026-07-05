@@ -12,11 +12,11 @@ export function openHtmlReport(sessionId: string): void {
   window.open(`${BASE}/api/reports/${sessionId}/html`, "_blank");
 }
 
-/** Trigger PDF download. */
+/** Trigger full analyst PDF report download. */
 export function downloadPdfReport(sessionId: string): void {
   const a = document.createElement("a");
   a.href = `${BASE}/api/reports/${sessionId}/pdf`;
-  a.download = `argus-report-${sessionId.slice(0, 8)}.pdf`;
+  a.download = `argus-analyst-report-${sessionId.slice(0, 8)}.pdf`;
   a.click();
 }
 

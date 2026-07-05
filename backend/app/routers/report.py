@@ -28,7 +28,7 @@ async def _load_context(session_id: str) -> dict:
     chains_data = await session_store.load_chains(session_id) or []
     audit_log = await session_store.load_audit(session_id)
 
-    target = session.get("target", {})
+    target = {**session.get("target", {}), "mode": session.get("mode")}
     findings = list(session.get("findings", {}).values())
     if findings and hasattr(findings[0], "model_dump"):
         findings = [f.model_dump() for f in findings]
@@ -47,8 +47,7 @@ async def get_html_report(session_id: str):
     """Return rendered HTML threat report."""
     context = await _load_context(session_id)
     cached = Path(settings.data_dir) / "reports" / f"{session_id}_report.html"
-    if not cached.exists():
-        await write_html_report(session_id, context)
+    await write_html_report(session_id, context)
     import aiofiles
     async with aiofiles.open(cached) as fh:
         html = await fh.read()
@@ -60,13 +59,12 @@ async def get_pdf_report(session_id: str):
     """Return PDF threat report generated via weasyprint."""
     context = await _load_context(session_id)
     cached = Path(settings.data_dir) / "reports" / f"{session_id}_report.pdf"
-    if not cached.exists():
-        try:
-            await write_pdf_report(session_id, context)
-        except RuntimeError as e:
-            raise HTTPException(status_code=503, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+    try:
+        await write_pdf_report(session_id, context)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
     return FileResponse(
         path=str(cached),
         media_type="application/pdf",
@@ -81,7 +79,7 @@ async def get_stix_report(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
     chains_data = await session_store.load_chains(session_id) or []
-    target = session.get("target", {})
+    target = {**session.get("target", {}), "mode": session.get("mode")}
     findings = list(session.get("findings", {}).values())
     if findings and hasattr(findings[0], "model_dump"):
         findings = [f.model_dump() for f in findings]
