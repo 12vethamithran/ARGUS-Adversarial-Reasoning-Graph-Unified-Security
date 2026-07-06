@@ -72,7 +72,11 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       label: "Export PDF Report",
       description: "Download the threat report as PDF",
       shortcut: "E P",
-      action: () => session ? downloadPdfReport(session.id) : toast.error("No active session to export."),
+      action: () => session
+        ? void downloadPdfReport(session.id).catch((error) => {
+            toast.error(error instanceof Error ? error.message : "PDF export failed.");
+          })
+        : toast.error("No active session to export."),
       keywords: ["report", "pdf", "download"],
     },
     {

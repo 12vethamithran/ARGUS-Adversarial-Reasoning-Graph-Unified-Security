@@ -56,7 +56,7 @@ async def get_html_report(session_id: str):
 
 @router.get("/{session_id}/pdf")
 async def get_pdf_report(session_id: str):
-    """Return PDF threat report generated via weasyprint."""
+    """Return the downloadable analyst PDF threat report."""
     context = await _load_context(session_id)
     cached = Path(settings.data_dir) / "reports" / f"{session_id}_report.pdf"
     try:
@@ -68,7 +68,7 @@ async def get_pdf_report(session_id: str):
     return FileResponse(
         path=str(cached),
         media_type="application/pdf",
-        filename=f"argus-report-{session_id[:8]}.pdf",
+        filename=f"argus-analyst-report-{session_id[:8]}.pdf",
     )
 
 

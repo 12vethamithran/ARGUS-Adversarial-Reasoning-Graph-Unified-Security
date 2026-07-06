@@ -182,8 +182,8 @@ def _safe_text(value: Any) -> str:
     return escape(str(value))
 
 
-def _build_reportlab_pdf(out: Path, context: dict[str, Any], fallback_reason: str) -> None:
-    """Build a dependable PDF when WeasyPrint's native stack is unavailable."""
+def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str = "") -> None:
+    """Build the analyst PDF with ReportLab."""
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER
@@ -199,9 +199,7 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], fallback_reason: st
             TableStyle,
         )
     except ImportError as exc:
-        raise RuntimeError(
-            "PDF generation failed: install weasyprint native dependencies or reportlab"
-        ) from exc
+        raise RuntimeError("reportlab is not installed") from exc
 
     def p(value: Any, style: Any) -> Any:
         text = _safe_text(value).replace("\n", "<br/>")
@@ -283,9 +281,9 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], fallback_reason: st
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
     ]))
-    if fallback_reason:
+    if renderer_note:
         story.append(Spacer(1, 8))
-        story.append(p(f"Renderer note: {fallback_reason}", styles["Small"]))
+        story.append(p(f"Renderer note: {renderer_note}", styles["Small"]))
 
     story.append(PageBreak())
     story.append(p("Executive Overview", styles["Section"]))
@@ -395,22 +393,158 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], fallback_reason: st
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
 
 
+def _pdf_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _wrap_line(value: Any, width: int = 92) -> list[str]:
+    words = str(value or "Not available").replace("\n", " ").split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if len(candidate) > width and current:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines or ["Not available"]
+
+
+def _build_plain_pdf(out: Path, context: dict[str, Any], renderer_note: str) -> None:
+    """Last-resort PDF writer with no third-party runtime dependencies."""
+    target = context.get("target") or {}
+    findings = context.get("findings") or []
+    chains = context.get("chains") or []
+    layer_summary = context.get("layer_summary") or []
+    counts = context.get("counts") or {}
+
+    lines = [
+        "ARGUS Analyst Attack Report",
+        f"Target: {target.get('description') or target.get('url') or 'Unknown target'}",
+        f"Generated: {context.get('generated_at')}",
+        f"Overall rating: {context.get('risk_rating')} ({context.get('risk_score', 0)}/100)",
+        str(context.get("analyst_verdict") or ""),
+        f"Renderer note: {renderer_note}",
+        "",
+        "Severity Distribution",
+    ]
+    lines.extend(f"- {severity.upper()}: {counts.get(severity, 0)}" for severity in ["critical", "high", "medium", "low", "info"])
+    lines.extend(["", "Layer Coverage"])
+    for row in layer_summary:
+        highest = (row.get("highest") or {}).get("title", "None")
+        lines.append(
+            f"- L{row.get('layer')} {row.get('name')}: {row.get('count', 0)} finding(s), "
+            f"{row.get('exploitable', 0)} exploitable, highest: {highest}"
+        )
+    lines.extend(["", "Attack Chain Walkthrough"])
+    if not chains:
+        lines.append("No cross-layer attack chain was produced for this session.")
+    for chain in chains:
+        lines.append(f"Chain {chain.get('index')}: {chain.get('rating')} - priority {chain.get('priority_pct')}%")
+        lines.extend(_wrap_line(chain.get("narrative"), 92))
+        lines.append(
+            f"Exploitability {chain.get('exploitability_pct')}% | "
+            f"Impact {chain.get('impact_pct')}% | Novelty {chain.get('novelty_pct')}%"
+        )
+        for step in chain.get("step_findings") or []:
+            lines.append(
+                f"  Step: L{step.get('layer')} {step.get('layer_name')} - {step.get('title')} "
+                f"({str(step.get('severity', '')).upper()}, confidence {step.get('confidence_pct')}%)"
+            )
+        for remediation in chain.get("remediations") or []:
+            lines.extend(_wrap_line(
+                f"  Remediate L{remediation.get('layer')}: {remediation.get('action')} [{remediation.get('ref')}]",
+                88,
+            ))
+        lines.append("")
+    lines.extend(["Finding Detail and Analyst Rating"])
+    for finding in findings:
+        lines.append(f"- {finding.get('title')} - {str(finding.get('severity', '')).upper()}")
+        lines.append(
+            f"  L{finding.get('layer')} {finding.get('layer_name')} | "
+            f"Confidence {finding.get('confidence_pct')}% | Exploitable: {finding.get('exploitable')}"
+        )
+        lines.extend(_wrap_line(f"  {finding.get('severity_rationale')}", 88))
+        if finding.get("decision_reason"):
+            lines.extend(_wrap_line(f"  Decision: {finding.get('decision_reason')}", 88))
+    lines.extend(["", "Terminal Validation Audit"])
+    audit = context.get("audit_log") or []
+    if not audit:
+        lines.append("No terminal validation commands were recorded for this session.")
+    else:
+        for entry in audit[-20:]:
+            lines.extend(_wrap_line(f"{entry.get('timestamp', '')} | {entry.get('status', '')} | {entry.get('command', entry)}", 92))
+
+    wrapped_lines = [part for line in lines for part in (_wrap_line(line, 96) if len(line) > 96 else [line])]
+    page_lines = [wrapped_lines[i:i + 48] for i in range(0, len(wrapped_lines), 48)] or [["ARGUS Analyst Attack Report"]]
+
+    objects: list[bytes] = []
+
+    def add_object(payload: bytes) -> int:
+        objects.append(payload)
+        return len(objects)
+
+    font_id = add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    page_ids: list[int] = []
+    content_ids: list[int] = []
+    for index, page in enumerate(page_lines, start=1):
+        y = 790
+        stream_lines = ["BT", "/F1 10 Tf", "50 790 Td"]
+        for line in page:
+            safe = _pdf_escape(line).encode("latin-1", "replace").decode("latin-1")
+            stream_lines.append(f"({safe}) Tj")
+            stream_lines.append("0 -14 Td")
+            y -= 14
+            if y < 60:
+                break
+        stream_lines.extend(["ET", f"BT /F1 8 Tf 50 28 Td (ARGUS Analyst Report - Page {index}) Tj ET"])
+        stream = "\n".join(stream_lines).encode("latin-1", "replace")
+        content_ids.append(add_object(b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream"))
+        page_ids.append(add_object(b""))
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids).encode()
+    pages_id = add_object(b"<< /Type /Pages /Kids [" + kids + b"] /Count " + str(len(page_ids)).encode() + b" >>")
+    catalog_id = add_object(b"<< /Type /Catalog /Pages " + str(pages_id).encode() + b" 0 R >>")
+    for i, page_id in enumerate(page_ids):
+        objects[page_id - 1] = (
+            b"<< /Type /Page /Parent " + str(pages_id).encode() +
+            b" 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " +
+            str(font_id).encode() + b" 0 R >> >> /Contents " +
+            str(content_ids[i]).encode() + b" 0 R >>"
+        )
+
+    data = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, payload in enumerate(objects, start=1):
+        offsets.append(len(data))
+        data.extend(f"{index} 0 obj\n".encode())
+        data.extend(payload)
+        data.extend(b"\nendobj\n")
+    xref = len(data)
+    data.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    data.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        data.extend(f"{offset:010d} 00000 n \n".encode())
+    data.extend(
+        b"trailer\n<< /Size " + str(len(objects) + 1).encode() +
+        b" /Root " + str(catalog_id).encode() + b" 0 R >>\nstartxref\n" +
+        str(xref).encode() + b"\n%%EOF\n"
+    )
+    out.write_bytes(bytes(data))
+
+
 async def write_pdf_report(session_id: str, context: dict[str, Any]) -> Path:
     """Render and persist a PDF report. Returns path."""
     session_id = validate_session_id(session_id)
     out = _REPORTS_DIR_FUNC() / f"{session_id}_report.pdf"
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
-        from weasyprint import HTML as WPHtml
-
-        html = _render_html(context)
-        WPHtml(string=html, base_url=str(_TEMPLATE_DIR)).write_pdf(str(out))
-    except Exception:
-        _build_reportlab_pdf(
-            out,
-            context,
-            "Primary HTML renderer unavailable; generated with built-in fallback renderer.",
-        )
+        _build_reportlab_pdf(out, context)
+    except Exception as exc:
+        _build_plain_pdf(out, context, f"ReportLab renderer unavailable; generated with emergency PDF renderer. Detail: {exc}")
     return out
 
 

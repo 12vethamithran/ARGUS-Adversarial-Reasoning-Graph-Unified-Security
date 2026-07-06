@@ -25,10 +25,12 @@ export function ReportStudio() {
   const layersHit = new Set(findingList.map((f) => f.layer)).size;
 
   const canExport = !!session && !isRunning;
-  function guard(fn: () => void) {
+  function guard(fn: () => void | Promise<void>) {
     if (!session) return toast.error("No session to export yet.");
     if (isRunning) return toast.info("Wait for the analysis to finish before exporting.");
-    fn();
+    void Promise.resolve(fn()).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Report export failed.");
+    });
   }
 
   const exportBtn = "flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded border border-line/20 text-text-secondary hover:text-accent hover:border-accent/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed";

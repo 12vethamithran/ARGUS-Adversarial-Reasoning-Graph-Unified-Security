@@ -8,7 +8,7 @@ the FastAPI routers (not available in the test venv).
 import pytest
 
 from app.storage import session_store
-from app.storage.report_writer import build_report_context
+from app.storage.report_writer import build_report_context, write_pdf_report
 from app.models.finding import Finding
 from app.models.chain import Chain, Remediation
 
@@ -58,6 +58,32 @@ async def test_persist_then_build_report_context(tmp_path, monkeypatch):
     assert ctx["chains"][0]["step_findings"][0]["title"] == "Indirect prompt injection"
     assert ctx["findings"][0]["confidence_pct"] == 90
     assert ctx["layer_summary"][1]["name"] == "LLM Probe"
+
+
+@pytest.mark.asyncio
+async def test_write_pdf_report_creates_downloadable_pdf(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.config.settings.data_dir", str(tmp_path))
+
+    finding = Finding(layer=2, title="Indirect prompt injection", severity="critical",
+                      owasp_ref="LLM01:2025", exploitable=True, confidence=0.91)
+    chain = Chain(steps=[finding.id], narrative="L2 prompt injection",
+                  exploitability=0.9, impact=0.85, novelty=0.5, priority=0.88,
+                  remediations=[Remediation(layer=2, action="filter retrieved content", ref="LLM01:2025")])
+    sid = "01PDFTESTSESSION000000000"
+    ctx = build_report_context(
+        session_id=sid,
+        target={"description": "https://example.test", "mode": "advanced"},
+        findings=[finding.model_dump()],
+        chains=[chain.model_dump()],
+        audit_log=[],
+    )
+
+    path = await write_pdf_report(sid, ctx)
+
+    assert path.exists()
+    assert path.suffix == ".pdf"
+    assert path.read_bytes().startswith(b"%PDF-")
+    assert path.stat().st_size > 1000
 
 
 @pytest.mark.asyncio
