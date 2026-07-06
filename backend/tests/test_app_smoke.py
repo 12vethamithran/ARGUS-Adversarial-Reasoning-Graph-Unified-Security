@@ -55,3 +55,20 @@ def test_manifest_only_target_uses_real_l6_scan(client):
     r = client.post("/api/analyze", json=body)
     assert r.status_code == 200
     assert "CVE-2023-32681" in r.text
+
+
+def test_mock_analysis_session_exports_pdf(client):
+    body = {
+        "mode": "basic",
+        "target": {"description": "demo target"},
+        "layers": [1, 2, 3],
+    }
+    r = client.post("/api/analyze", json=body)
+    assert r.status_code == 200
+    sid = r.headers["X-Session-Id"]
+    assert sid in r.text
+
+    pdf = client.get(f"/api/reports/{sid}/pdf")
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF-")

@@ -1,6 +1,7 @@
 """POST /api/analyze — SSE stream, real layers + mock fallback."""
 from __future__ import annotations
 import asyncio
+from types import SimpleNamespace
 from typing import AsyncGenerator
 
 from fastapi import APIRouter
@@ -76,7 +77,7 @@ async def _persist(session_id: str, body: StartAnalysisBody, state) -> None:
         pass  # reporting persistence is non-critical to the live stream
 
 
-async def _mock_stream(session_id: str, layers: list[int]) -> AsyncGenerator[str, None]:
+async def _mock_stream(session_id: str, body: StartAnalysisBody, layers: list[int]) -> AsyncGenerator[str, None]:
     MOCK = [
         {"layer":1,"title":"Missing Content-Security-Policy","severity":"medium","owasp_ref":"A05:2021","exploitable":False,"confidence":0.95},
         {"layer":1,"title":"CORS wildcard (*) allows any origin","severity":"high","owasp_ref":"A05:2021","exploitable":True,"confidence":0.88},
@@ -118,11 +119,14 @@ async def _mock_stream(session_id: str, layers: list[int]) -> AsyncGenerator[str
     await asyncio.sleep(0.1)
 
     finding_ids = []
+    findings: dict[str, Finding] = {}
+    chains: list[Chain] = []
     for fd in MOCK:
         if fd["layer"] not in layers:
             continue
         f = Finding(evidence={"mock": True}, **{k: v for k, v in fd.items()})
         finding_ids.append(f.id)
+        findings[f.id] = f
         yield sse(finding_event(f, "discovered"))
         await asyncio.sleep(0.2)
         if f.exploitable:
@@ -155,8 +159,10 @@ async def _mock_stream(session_id: str, layers: list[int]) -> AsyncGenerator[str
             yield sse(StreamEvent(type="node_state", payload={"finding_id": fid, "state": "chained"}))
             await asyncio.sleep(0.07)
         yield sse(StreamEvent.chain_found(chain.model_dump()))
+        chains.append(chain)
 
     await asyncio.sleep(0.1)
+    await _persist(session_id, body, SimpleNamespace(findings=findings, chains=chains))
     yield sse(StreamEvent.complete(session_id))
 
 
@@ -173,7 +179,7 @@ async def start_analysis(body: StartAnalysisBody):
             async for chunk in _run_analysis(session_id, body):
                 yield chunk
         else:
-            async for chunk in _mock_stream(session_id, layers):
+            async for chunk in _mock_stream(session_id, body, layers):
                 yield chunk
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers={

@@ -20,7 +20,7 @@ export function startAnalysisStream(
   mode: AnalysisMode,
   layers?: number[]
 ): Promise<void> {
-  const { applyEvent, startSession } = useSessionStore.getState();
+  const { applyEvent, setSessionId, startSession } = useSessionStore.getState();
   startSession(target);
 
   return (async () => {
@@ -42,6 +42,9 @@ export function startAnalysisStream(
       toast.error(`Analysis error: ${response.statusText}`);
       throw new Error(response.statusText);
     }
+
+    const backendSessionId = response.headers.get("X-Session-Id");
+    if (backendSessionId) setSessionId(backendSessionId);
 
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();

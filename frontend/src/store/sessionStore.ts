@@ -10,6 +10,7 @@ interface SessionState {
   reasoningLog: string[];
   layerStatus: Record<number, { done: boolean; findingCount: number }>;
   setMode: (mode: AnalysisMode) => void;
+  setSessionId: (sessionId: string) => void;
   startSession: (target: AnalysisTarget) => void;
   applyEvent: (event: StreamEvent) => void;
   reset: () => void;
@@ -25,6 +26,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   layerStatus: {},
 
   setMode: (mode) => set({ mode }),
+
+  setSessionId: (sessionId) => set((state) => ({
+    session: state.session ? { ...state.session, id: sessionId } : state.session,
+  })),
 
   startSession: (target) => {
     const { mode } = get();
@@ -104,7 +109,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
 
       case "complete": {
-        set({ isRunning: false, session: state.session ? { ...state.session, status: "complete" } : null });
+        const sessionId = (event.payload as any).session_id;
+        set({
+          isRunning: false,
+          session: state.session
+            ? { ...state.session, id: sessionId || state.session.id, status: "complete" }
+            : null,
+        });
         break;
       }
 
