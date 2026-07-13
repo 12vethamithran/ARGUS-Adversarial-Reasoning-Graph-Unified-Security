@@ -46,6 +46,26 @@ export function LiveAttackChain() {
           </motion.span>
         </div>
 
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            ["entry", "web input"],
+            ["pivot", "agent tool"],
+            ["impact", "risk chain"],
+          ].map(([label, value], index) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, y: 8 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.08 }}
+              className="rounded-md border border-line/10 bg-bg/35 px-3 py-2"
+            >
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-text-muted">{label}</p>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-accent">{value}</p>
+            </motion.div>
+          ))}
+        </div>
+
         <div className="relative h-56 overflow-hidden rounded-md border border-line/10 bg-bg/55">
           <div className="argus-workspace-grid absolute inset-0 opacity-60" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent,rgb(var(--accent)/0.07)_52%,transparent)]" />

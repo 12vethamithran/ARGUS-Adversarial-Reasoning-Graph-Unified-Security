@@ -8,6 +8,8 @@ const FEATURES = [
   { k: "03", title: "Unified security", body: "Connects web, LLM, RAG, agentic, identity, and network risk.", Icon: ShieldCheck },
 ];
 
+const TELEMETRY = ["Web", "LLM", "RAG", "MCP", "Network", "Identity"];
+
 export function SystemReveal() {
   const reducedMotion = useReducedMotion();
 
@@ -57,6 +59,28 @@ export function SystemReveal() {
           >
             <Bot className="h-4 w-4 text-accent" />
             Adversarial Reasoning Graph Unified Security
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.68, duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-8 grid gap-2 sm:grid-cols-6"
+          >
+            {TELEMETRY.map((label, index) => (
+              <div key={label} className="relative overflow-hidden rounded-md border border-line/10 bg-bg/45 px-3 py-2">
+                <motion.span
+                  aria-hidden
+                  className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-accent/15 to-transparent"
+                  animate={reducedMotion ? undefined : { x: ["-120%", "240%"] }}
+                  transition={{ duration: 2.8, delay: index * 0.18, repeat: Infinity, ease: "linear" }}
+                />
+                <div className="relative flex items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-secondary">{label}</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_rgb(var(--accent)/0.6)]" />
+                </div>
+              </div>
+            ))}
           </motion.div>
         </div>
 
