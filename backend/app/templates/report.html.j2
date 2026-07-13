@@ -30,7 +30,7 @@
     color: var(--ink);
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 11px;
-    line-height: 1.45;
+    line-height: 1.52;
     margin: 0;
   }
   h1, h2, h3 { margin: 0; }
@@ -40,16 +40,16 @@
     color: var(--blue);
     font-size: 15px;
     letter-spacing: 0.08em;
-    margin: 20px 0 10px;
+    margin: 22px 0 11px;
     padding-bottom: 5px;
     text-transform: uppercase;
   }
-  h3 { font-size: 12px; margin-bottom: 6px; }
-  p { margin: 0 0 8px; }
+  h3 { font-size: 12px; line-height: 1.35; margin-bottom: 6px; }
+  p { margin: 0 0 9px; }
   table { border-collapse: collapse; width: 100%; }
   th, td {
     border-bottom: 1px solid #eaecf0;
-    padding: 6px 7px;
+    padding: 7px 8px;
     text-align: left;
     vertical-align: top;
   }
@@ -73,8 +73,9 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 6px;
-    margin-bottom: 10px;
-    padding: 11px;
+    break-inside: avoid;
+    margin-bottom: 12px;
+    padding: 13px;
   }
   .grid-2 { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
   .grid-3 { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); }
@@ -82,6 +83,7 @@
   .metric {
     border: 1px solid var(--line);
     border-radius: 6px;
+    break-inside: avoid;
     padding: 10px;
   }
   .metric .value { font-family: Consolas, monospace; font-size: 21px; font-weight: 700; }
@@ -124,10 +126,21 @@
     border: 1px solid var(--line);
     border-left: 4px solid var(--blue);
     border-radius: 6px;
-    margin-bottom: 10px;
-    padding: 10px;
+    break-inside: avoid;
+    margin-bottom: 12px;
+    padding: 12px;
     page-break-inside: avoid;
   }
+  .section-lead {
+    color: #344054;
+    font-size: 10px;
+    margin-bottom: 11px;
+  }
+  .summary-list {
+    margin: 0;
+    padding-left: 16px;
+  }
+  .summary-list li { margin-bottom: 6px; }
   .finding.critical { border-left-color: var(--critical); }
   .finding.high { border-left-color: var(--high); }
   .finding.medium { border-left-color: var(--medium); }
@@ -169,6 +182,13 @@
     grid-template-columns: 110px 1fr;
     margin-bottom: 4px;
   }
+  .reasoning {
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 5px;
+    margin-top: 8px;
+    padding: 8px;
+  }
   .footer-note {
     border-top: 1px solid var(--line);
     color: var(--muted);
@@ -182,7 +202,7 @@
 <section class="cover">
   <div>
     <h1 class="brand">ARGUS</h1>
-    <div class="subtitle">Analyst Threat Report - Vulnerability Severity and Attack Chain Overview</div>
+    <div class="subtitle">Structured Analyst Threat Report - Vulnerability Severity, Reasoning, and Attack Chain Overview</div>
   </div>
   <div class="meta">
     <div><strong>Session:</strong> {{ session_id }}</div>
@@ -197,6 +217,11 @@
   <div>
     <h3>Overall analyst rating: <span class="badge {{ risk_rating | lower }}">{{ risk_rating }}</span></h3>
     <p>{{ analyst_verdict }}</p>
+    <ul class="summary-list">
+      {% for item in executive_summary %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
     {% if top_chain %}
     <p><strong>Top chain:</strong> {{ top_chain.rating }} at {{ top_chain.priority_pct }}% priority across {{ top_chain.step_findings | length }} step(s).</p>
     {% else %}
@@ -216,12 +241,23 @@
 <div class="panel">
   <table>
     <tbody>
+      <tr><th>Primary target</th><td class="break">{{ target_label }}</td></tr>
       {% if target.url %}<tr><th>URL</th><td class="mono break">{{ target.url }}</td></tr>{% endif %}
       {% if target.llm_endpoint %}<tr><th>LLM endpoint</th><td class="mono break">{{ target.llm_endpoint }}</td></tr>{% endif %}
       {% if target.description %}<tr><th>Description</th><td>{{ target.description }}</td></tr>{% endif %}
       <tr><th>Domains hit</th><td>{{ domains_hit | join(", ") if domains_hit else "None" }}</td></tr>
     </tbody>
   </table>
+</div>
+
+<h2>Scope and Methodology</h2>
+<div class="panel">
+  <p class="section-lead">This report is generated from persisted ARGUS session artifacts and normalizes findings, chains, and validation evidence into a review-ready structure.</p>
+  <ul class="summary-list">
+    {% for note in methodology_notes %}
+    <li>{{ note }}</li>
+    {% endfor %}
+  </ul>
 </div>
 
 <h2>Severity Distribution</h2>
@@ -253,6 +289,7 @@
 
 {% if chains %}
 <h2>Attack Chain Walkthrough</h2>
+<p class="section-lead">Chains are ordered by ARGUS priority and show where a defender can break the path fastest.</p>
 {% for chain in chains %}
 <section class="chain">
   <div style="display:flex; justify-content:space-between; gap:10px;">
@@ -260,6 +297,10 @@
     <span class="badge {{ 'critical' if chain.priority >= 0.85 else 'high' if chain.priority >= 0.70 else 'medium' }}">{{ chain.priority_pct }}% priority</span>
   </div>
   <p>{{ chain.narrative }}</p>
+  <div class="reasoning">
+    <strong>Reasoning path:</strong> <span class="mono break">{{ chain.path_label }}</span><br/>
+    <strong>Analyst note:</strong> {{ chain.reasoning_summary }}
+  </div>
   <div class="chain-path">
     {% for f in chain.step_findings %}
     <span class="step">L{{ f.layer }} {{ f.layer_name }} - {{ f.severity | upper }}</span>
@@ -286,6 +327,7 @@
 {% endif %}
 
 <h2>Finding Detail and Analyst Rating</h2>
+<p class="section-lead">Findings are sorted by severity and confidence. Evidence excerpts are intentionally compact to preserve PDF readability.</p>
 {% for f in findings %}
 <section class="finding {{ f.severity }}">
   <div style="display:flex; justify-content:space-between; gap:10px;">

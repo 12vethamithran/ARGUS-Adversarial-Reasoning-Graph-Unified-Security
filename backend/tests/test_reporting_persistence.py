@@ -5,9 +5,12 @@ call 404'd. The router (_persist) writes the dict shape asserted here; this test
 locks in the store -> load -> build_report_context round-trip without importing
 the FastAPI routers (not available in the test venv).
 """
+from pathlib import Path
+
 import pytest
 
 from app.storage import session_store
+
 from app.storage.report_writer import build_report_context, write_pdf_report
 from app.models.finding import Finding
 from app.models.chain import Chain, Remediation
@@ -56,8 +59,37 @@ async def test_persist_then_build_report_context(tmp_path, monkeypatch):
     assert ctx["risk_score"] >= 80
     assert ctx["risk_rating"] == "CRITICAL"
     assert ctx["chains"][0]["step_findings"][0]["title"] == "Indirect prompt injection"
+    assert ctx["chains"][0]["path_label"] == "L2 LLM Probe -> L4 MCP / Agentic"
     assert ctx["findings"][0]["confidence_pct"] == 90
     assert ctx["layer_summary"][1]["name"] == "LLM Probe"
+    assert ctx["target_label"] == "agent app"
+    assert ctx["executive_summary"]
+    assert ctx["methodology_notes"]
+
+
+def test_report_context_and_template_are_structured_and_spacing_safe():
+    finding = Finding(layer=3, title="RAG corpus poisoning", severity="high",
+                      owasp_ref="LLM04:2025", exploitable=True, confidence=0.84)
+    chain = Chain(steps=[finding.id], narrative="Poisoned retrieval drives model output",
+                  reasoning=["Retrieved content is untrusted.", "Model response inherits poisoned context."],
+                  exploitability=0.8, impact=0.76, novelty=0.45, priority=0.79,
+                  remediations=[Remediation(layer=3, action="isolate trusted corpus segments", ref="LLM04:2025")])
+    ctx = build_report_context(
+        session_id="01HTMLREPORT00000000000",
+        target={"description": "customer support agent", "mode": "advanced"},
+        findings=[finding.model_dump()],
+        chains=[chain.model_dump()],
+        audit_log=[],
+    )
+
+    template = Path("backend/app/templates/report.html.j2").read_text()
+
+    assert "Structured Analyst Threat Report" in template
+    assert "Scope and Methodology" in template
+    assert "Reasoning path:" in template
+    assert ctx["chains"][0]["reasoning_summary"] == "Retrieved content is untrusted. Model response inherits poisoned context."
+    assert "break-inside: avoid" in template
+    assert "Primary target" in template
 
 
 @pytest.mark.asyncio

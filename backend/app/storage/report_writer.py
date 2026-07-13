@@ -85,6 +85,58 @@ def _severity_rationale(finding: dict) -> str:
     return f"{severity.upper()} severity with {confidence}% confidence; {exploitable}."
 
 
+def _target_label(target: dict[str, Any]) -> str:
+    return (
+        target.get("url")
+        or target.get("llm_endpoint")
+        or target.get("description")
+        or "Unknown target"
+    )
+
+
+def _executive_summary(risk_rating: str, risk_score: int, findings: list[dict], chains: list[dict]) -> list[str]:
+    exploitable = sum(1 for f in findings if f.get("exploitable"))
+    affected_layers = sorted({f.get("layer") for f in findings if f.get("layer")})
+    critical_high = sum(1 for f in findings if f.get("severity") in {"critical", "high"})
+    summary = [
+        (
+            f"ARGUS rates this assessment as {risk_rating} ({risk_score}/100) based on "
+            f"{len(findings)} finding(s), {critical_high} critical/high signal(s), and "
+            f"{exploitable} exploitable condition(s)."
+        ),
+        (
+            f"Coverage spans {len(affected_layers)} of 8 reasoning layers"
+            f"{': L' + ', L'.join(str(l) for l in affected_layers) if affected_layers else ''}."
+        ),
+    ]
+    if chains:
+        top = max(chains, key=lambda c: float(c.get("priority", 0) or 0))
+        summary.append(
+            f"The highest-priority chain is {round(float(top.get('priority', 0) or 0) * 100)}% priority, "
+            f"linking {len(top.get('steps', []))} observed step(s) into a remediation path."
+        )
+    else:
+        summary.append("No cross-layer exploit chain was generated; triage should start with exploitable high-severity findings.")
+    return summary
+
+
+def _methodology_notes() -> list[str]:
+    return [
+        "Findings are grouped by ARGUS reasoning layer and ordered by severity, confidence, and exploitability.",
+        "Risk score combines maximum severity, confirmed exploitability, and breadth across affected layers.",
+        "Attack chains are prioritized with exploitability, impact, novelty, and available remediation breakpoints.",
+        "Evidence excerpts are shortened for report readability; source session artifacts remain the authority of record.",
+    ]
+
+
+def _reasoning_text(value: Any, fallback: Any = "") -> str:
+    if isinstance(value, list):
+        return " ".join(str(item).strip() for item in value if str(item).strip())
+    if isinstance(value, dict):
+        return json.dumps(value, default=str)
+    return str(value or fallback or "No chain reasoning was recorded.")
+
+
 def _short_evidence(evidence: dict[str, Any], limit: int = 6) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for key, value in (evidence or {}).items():
@@ -133,6 +185,10 @@ def _enrich_chains(chains: list[dict], finding_by_id: dict[str, dict]) -> list[d
         ]
         c["affected_layers"] = sorted({f["layer"] for f in c["step_findings"]})
         c["affected_domains"] = sorted({f["layer_domain"] for f in c["step_findings"]})
+        c["path_label"] = " -> ".join(
+            f"L{f.get('layer')} {f.get('layer_name')}" for f in c["step_findings"]
+        ) or "No mapped finding path"
+        c["reasoning_summary"] = _reasoning_text(c.get("reasoning"), c.get("narrative"))
         enriched.append(c)
     return sorted(enriched, key=lambda c: c.get("priority", 0), reverse=True)
 
@@ -191,6 +247,7 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import mm
         from reportlab.platypus import (
+            KeepTogether,
             PageBreak,
             Paragraph,
             SimpleDocTemplate,
@@ -233,11 +290,27 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
         spaceAfter=8,
     ))
     styles.add(ParagraphStyle(
+        name="Subsection",
+        parent=styles["Heading3"],
+        fontSize=11,
+        leading=13,
+        textColor=colors.HexColor("#1e293b"),
+        spaceBefore=8,
+        spaceAfter=5,
+    ))
+    styles.add(ParagraphStyle(
         name="Small",
         parent=styles["BodyText"],
         fontSize=8,
         leading=10,
         textColor=colors.HexColor("#475569"),
+    ))
+    styles.add(ParagraphStyle(
+        name="TinyMono",
+        parent=styles["Small"],
+        fontName="Courier",
+        fontSize=7,
+        leading=9,
     ))
     styles.add(ParagraphStyle(
         name="Cell",
@@ -257,9 +330,11 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
     chains = context.get("chains") or []
     layer_summary = context.get("layer_summary") or []
     counts = context.get("counts") or {}
+    methodology = context.get("methodology_notes") or []
+    executive_summary = context.get("executive_summary") or []
 
     story.append(p("ARGUS Analyst Attack Report", styles["CoverTitle"]))
-    story.append(p(target.get("description", "Unknown target"), styles["Heading2"]))
+    story.append(p(context.get("target_label") or target.get("description", "Unknown target"), styles["Heading2"]))
     story.append(p(context.get("analyst_verdict", ""), styles["BodyText"]))
     story.append(Spacer(1, 8))
     story.append(Table(
@@ -270,6 +345,7 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
             [p("Exploitable", styles["Cell"]), p(context.get("exploitable_count"), styles["Cell"])],
             [p("Attack chains", styles["Cell"]), p(len(chains), styles["Cell"])],
             [p("Generated", styles["Cell"]), p(context.get("generated_at"), styles["Cell"])],
+            [p("Assessment mode", styles["Cell"]), p(target.get("mode", "unknown"), styles["Cell"])],
         ],
         colWidths=[44 * mm, 110 * mm],
     ))
@@ -287,6 +363,36 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
 
     story.append(PageBreak())
     story.append(p("Executive Overview", styles["Section"]))
+    for item in executive_summary:
+        story.append(p(f"- {item}", styles["BodyText"]))
+    story.append(Spacer(1, 6))
+
+    story.append(p("Scope and Methodology", styles["Section"]))
+    scope_rows = [[p("Field", styles["HeaderCell"]), p("Value", styles["HeaderCell"])]]
+    for label, value in [
+        ("Target", context.get("target_label")),
+        ("Mode", target.get("mode", "unknown")),
+        ("Domains hit", ", ".join(context.get("domains_hit") or []) or "None"),
+        ("Session", context.get("session_id")),
+    ]:
+        scope_rows.append([p(label, styles["Cell"]), p(value, styles["Cell"])])
+    story.append(Table(scope_rows, colWidths=[42 * mm, 122 * mm], repeatRows=1))
+    story[-1].setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(Spacer(1, 6))
+    for item in methodology:
+        story.append(p(f"- {item}", styles["Small"]))
+    story.append(Spacer(1, 8))
+
+    story.append(p("Severity Distribution", styles["Section"]))
     severity_rows = [[p("Severity", styles["HeaderCell"]), p("Count", styles["HeaderCell"])]]
     for severity in ["critical", "high", "medium", "low", "info"]:
         severity_rows.append([p(severity.upper(), styles["Cell"]), p(counts.get(severity, 0), styles["Cell"])])
@@ -296,6 +402,10 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
 
     story.append(p("Layer Coverage", styles["Section"]))
@@ -319,56 +429,93 @@ def _build_reportlab_pdf(out: Path, context: dict[str, Any], renderer_note: str 
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
 
     story.append(p("Attack Chain Walkthrough", styles["Section"]))
     if not chains:
         story.append(p("No cross-layer attack chain was produced for this session.", styles["BodyText"]))
     for chain in chains:
-        story.append(p(
-            f"Chain {chain.get('index')}: {chain.get('rating')} - priority {chain.get('priority_pct')}%",
-            styles["Heading3"],
-        ))
-        story.append(p(chain.get("narrative"), styles["BodyText"]))
-        story.append(p(
-            f"Exploitability {chain.get('exploitability_pct')}% | Impact {chain.get('impact_pct')}% | Novelty {chain.get('novelty_pct')}%",
-            styles["Small"],
-        ))
+        block = [
+            p(
+                f"Chain {chain.get('index')}: {chain.get('rating')} - priority {chain.get('priority_pct')}%",
+                styles["Subsection"],
+            ),
+            p(chain.get("narrative"), styles["BodyText"]),
+            p(f"Path: {chain.get('path_label')}", styles["TinyMono"]),
+            p(
+                f"Exploitability {chain.get('exploitability_pct')}% | Impact {chain.get('impact_pct')}% | Novelty {chain.get('novelty_pct')}%",
+                styles["Small"],
+            ),
+            p(f"Reasoning: {chain.get('reasoning_summary')}", styles["Small"]),
+        ]
         for step in chain.get("step_findings") or []:
-            story.append(p(
+            block.append(p(
                 f"L{step.get('layer')} {step.get('layer_name')}: {step.get('title')} "
                 f"({str(step.get('severity', '')).upper()}, confidence {step.get('confidence_pct')}%)",
                 styles["Cell"],
             ))
         if chain.get("remediations"):
             for remediation in chain.get("remediations"):
-                story.append(p(
+                block.append(p(
                     f"Remediate L{remediation.get('layer')}: {remediation.get('action')} [{remediation.get('ref')}]",
                     styles["Small"],
                 ))
-        story.append(Spacer(1, 5))
+        block.append(Spacer(1, 7))
+        story.append(KeepTogether(block))
+
+    story.append(p("Remediation Priority Plan", styles["Section"]))
+    top_chain = context.get("top_chain")
+    if top_chain and top_chain.get("remediations"):
+        rows = [[p("Priority", styles["HeaderCell"]), p("Layer", styles["HeaderCell"]), p("Action", styles["HeaderCell"]), p("Reference", styles["HeaderCell"])]]
+        for idx, remediation in enumerate(top_chain.get("remediations") or [], start=1):
+            rows.append([
+                p(idx, styles["Cell"]),
+                p(f"L{remediation.get('layer')}", styles["Cell"]),
+                p(remediation.get("action"), styles["Cell"]),
+                p(remediation.get("ref"), styles["TinyMono"]),
+            ])
+        story.append(Table(rows, colWidths=[20 * mm, 24 * mm, 88 * mm, 32 * mm], repeatRows=1))
+        story[-1].setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+    else:
+        story.append(p("No chain-specific remediation plan was generated. Address exploitable critical and high findings first.", styles["BodyText"]))
 
     story.append(PageBreak())
     story.append(p("Finding Detail and Analyst Rating", styles["Section"]))
     for finding in findings:
-        story.append(p(
-            f"{finding.get('title')} - {str(finding.get('severity', '')).upper()}",
-            styles["Heading3"],
-        ))
-        story.append(p(
-            f"L{finding.get('layer')} {finding.get('layer_name')} | {finding.get('layer_domain')} | "
-            f"Confidence {finding.get('confidence_pct')}% | Exploitable: {finding.get('exploitable')}",
-            styles["Small"],
-        ))
-        story.append(p(finding.get("severity_rationale"), styles["BodyText"]))
+        block = [
+            p(
+                f"{finding.get('title')} - {str(finding.get('severity', '')).upper()}",
+                styles["Subsection"],
+            ),
+            p(
+                f"L{finding.get('layer')} {finding.get('layer_name')} | {finding.get('layer_domain')} | "
+                f"Confidence {finding.get('confidence_pct')}% | Exploitable: {finding.get('exploitable')}",
+                styles["Small"],
+            ),
+            p(finding.get("severity_rationale"), styles["BodyText"]),
+        ]
         if finding.get("decision_reason"):
-            story.append(p(
+            block.append(p(
                 f"Decision: {finding.get('decision_reason')} ({finding.get('decision_strength') or 'unspecified'} strength)",
                 styles["BodyText"],
             ))
         for item in finding.get("evidence_items") or []:
-            story.append(p(f"{item.get('key')}: {item.get('value')}", styles["Small"]))
-        story.append(Spacer(1, 6))
+            block.append(p(f"{item.get('key')}: {item.get('value')}", styles["Small"]))
+        block.append(Spacer(1, 8))
+        story.append(KeepTogether(block))
 
     story.append(p("Terminal Validation Audit", styles["Section"]))
     audit = context.get("audit_log") or []
@@ -569,12 +716,19 @@ def build_report_context(
     enriched_chains = _enrich_chains(chains, finding_by_id)
     top_chain = enriched_chains[0] if enriched_chains else None
     risk_score = _risk_score(enriched_findings)
+    risk_rating = _risk_rating(risk_score)
     exploitable_count = sum(1 for f in findings if f.get("exploitable"))
+    target_label = _target_label(target)
+    analyst_verdict = (
+        f"{risk_rating} risk: {exploitable_count} exploitable finding(s), "
+        f"{len(enriched_chains)} attack chain(s), and {len({f.get('layer') for f in findings})} layer(s) affected."
+    )
 
     return {
         "session_id": session_id,
         "generated_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
         "target": target,
+        "target_label": target_label,
         "findings": sorted_findings,
         "chains": enriched_chains,
         "top_chain": top_chain,
@@ -583,13 +737,12 @@ def build_report_context(
         "total_findings": len(findings),
         "exploitable_count": exploitable_count,
         "risk_score": risk_score,
-        "risk_rating": _risk_rating(risk_score),
+        "risk_rating": risk_rating,
         "layer_summary": _layer_summary(sorted_findings),
         "domains_hit": sorted({f["layer_domain"] for f in sorted_findings}),
-        "analyst_verdict": (
-            f"{_risk_rating(risk_score)} risk: {exploitable_count} exploitable finding(s), "
-            f"{len(enriched_chains)} attack chain(s), and {len({f.get('layer') for f in findings})} layer(s) affected."
-        ),
+        "analyst_verdict": analyst_verdict,
+        "executive_summary": _executive_summary(risk_rating, risk_score, enriched_findings, enriched_chains),
+        "methodology_notes": _methodology_notes(),
     }
 
 
