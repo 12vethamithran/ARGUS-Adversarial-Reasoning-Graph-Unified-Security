@@ -55,6 +55,7 @@ async def _run_analysis(session_id: str, body: StartAnalysisBody) -> AsyncGenera
         await _persist(session_id, body, state)
     except Exception as outer_exc:
         yield sse(StreamEvent.reasoning_token(f"Analysis error: {outer_exc}\n"))
+        yield sse(StreamEvent.error(str(outer_exc)))
         yield sse(StreamEvent.complete(session_id))
 
 

@@ -38,6 +38,8 @@ _LAYER_DEPS: dict[int, list[int]] = {
 LAYER_TIMEOUT = 45.0  # seconds per layer — L1 runs a real, active web scan
                       # (parallel, bounded probes) and legitimately needs > 12s.
 
+_SEVERITY_RANK = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}
+
 
 def _import_layer(layer_id: int):
     import importlib
@@ -56,6 +58,48 @@ def _should_run(layer_id: int, state: ArgusState) -> bool:
     return True
 
 
+def _normalized_layers(layers: list[int]) -> list[int]:
+    """Keep layer execution deterministic and safe for user-provided layer lists."""
+    seen: set[int] = set()
+    normalized: list[int] = []
+    for layer_id in layers:
+        if layer_id in _LAYER_CLASS and layer_id not in seen:
+            normalized.append(layer_id)
+            seen.add(layer_id)
+    return normalized
+
+
+def _sort_findings(findings):
+    return sorted(
+        findings,
+        key=lambda f: (
+            f.exploitable,
+            _SEVERITY_RANK.get(f.severity, 0),
+            f.confidence,
+            -f.layer,
+        ),
+        reverse=True,
+    )
+
+
+def _risk_summary(state: ArgusState) -> str:
+    findings = list(state.findings.values())
+    if not findings:
+        return "[ARGUS] Summary: no findings were produced by the selected layers.\n"
+
+    exploitable = [f for f in findings if f.exploitable]
+    severe = [f for f in findings if f.severity in {"critical", "high"}]
+    layers_hit = sorted({f.layer for f in findings})
+    chain_count = len(state.chains)
+    top_chain = max((c.priority for c in state.chains), default=0.0)
+    return (
+        f"[ARGUS] Summary: {len(findings)} findings across layers "
+        f"{', '.join(f'L{layer}' for layer in layers_hit)}; "
+        f"{len(exploitable)} exploitable, {len(severe)} high/critical, "
+        f"{chain_count} chain(s), top priority {top_chain:.2f}.\n"
+    )
+
+
 async def run_orchestrator(
     state: ArgusState,
 ) -> AsyncGenerator[StreamEvent, None]:
@@ -69,6 +113,12 @@ async def run_orchestrator(
     `complete` event on the normal path.
     """
     from app.engine.reasoner import stream_reasoning, _heuristic_chains
+
+    state.active_layers = _normalized_layers(state.active_layers)
+    if not state.active_layers:
+        yield StreamEvent.error("No valid layers selected.")
+        yield StreamEvent.complete(state.session_id)
+        return
 
     for layer_id in state.active_layers:
         if state.iteration >= state.max_iterations:
@@ -94,7 +144,7 @@ async def run_orchestrator(
             findings = await asyncio.wait_for(
                 layer.run(state.target, state), timeout=LAYER_TIMEOUT
             )
-            findings = calibrate_findings(findings)
+            findings = _sort_findings(calibrate_findings(findings))
         except asyncio.TimeoutError:
             yield StreamEvent.reasoning_token(f"L{layer_id} timed out after {LAYER_TIMEOUT}s.\n")
             yield StreamEvent.layer_done(layer_id, 0)
@@ -165,4 +215,5 @@ async def run_orchestrator(
     else:
         yield StreamEvent.reasoning_token("No exploitable findings — no chains generated.\n")
 
+    yield StreamEvent.reasoning_token(_risk_summary(state))
     yield StreamEvent.complete(state.session_id)

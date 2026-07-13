@@ -62,6 +62,16 @@ async def test_terminates_with_complete(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_invalid_layers_emit_error_and_complete():
+    state = ArgusState(session_id="t", mode="advanced", target={}, active_layers=[99, 99])
+    events = await _drive(state)
+
+    assert events[0].type == "error"
+    assert events[0].payload["message"] == "No valid layers selected."
+    assert events[-1].type == "complete"
+
+
+@pytest.mark.asyncio
 async def test_skips_layer_when_prereq_not_exploitable(monkeypatch):
     # L2 yields nothing exploitable -> L3 and L4 must skip (and L7/L8 transitively).
     monkeypatch.setattr(orch, "_import_layer", lambda lid: _StubLayer(lid, exploitable=False))
@@ -90,6 +100,7 @@ async def test_runs_dependent_layer_when_prereq_exploitable(monkeypatch):
     assert "skipped" not in tokens
     # Every active layer ran and recorded completion.
     assert state.completed_layers == [1, 2, 3, 4, 7, 8]
+    assert "Summary:" in tokens
 
 
 @pytest.mark.asyncio

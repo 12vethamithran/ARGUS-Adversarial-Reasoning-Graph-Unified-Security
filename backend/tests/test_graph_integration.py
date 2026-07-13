@@ -46,6 +46,12 @@ class TestGraphBuilder:
         G = build_graph([f1, f2, f3], [chain])
         # Chain of 3 steps = 2 edges
         assert G.number_of_edges() == 2
+        edge = G.edges[f1.id, f2.id]
+        assert edge["step_index"] == 0
+        assert edge["cross_layer"] is True
+        assert edge["source_layer"] == 1
+        assert edge["target_layer"] == 2
+        assert chain.id in G.nodes[f1.id]["chain_ids"]
 
     def test_node_attributes(self):
         f = _finding(2, sev="critical")
@@ -54,6 +60,8 @@ class TestGraphBuilder:
         assert node["layer"] == 2
         assert node["severity"] == "critical"
         assert node["exploitable"] is True
+        assert node["score"] > 0
+        assert node["chain_ids"] == []
 
     def test_d3_structure(self):
         findings = [_finding(1), _finding(2)]

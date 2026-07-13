@@ -7,6 +7,7 @@ from typing import Any
 import networkx as nx
 from networkx.readwrite import json_graph
 
+from app.engine.scorer import score_finding
 from app.models.finding import Finding
 from app.models.chain import Chain
 
@@ -31,6 +32,12 @@ def build_graph(
 ) -> nx.DiGraph:
     """Build a directed graph: findings as nodes, chain steps as edges."""
     G = nx.DiGraph()
+    chain_membership: dict[str, list[str]] = {}
+    chain_positions: dict[str, list[int]] = {}
+    for chain in chains:
+        for index, finding_id in enumerate(chain.steps):
+            chain_membership.setdefault(finding_id, []).append(chain.id)
+            chain_positions.setdefault(finding_id, []).append(index)
 
     for f in findings:
         G.add_node(
@@ -45,6 +52,9 @@ def build_graph(
             owasp_ref=f.owasp_ref or "",
             mitre_ref=f.mitre_ref or "",
             node_state=f.node_state,
+            score=score_finding(f),
+            chain_ids=chain_membership.get(f.id, []),
+            chain_positions=chain_positions.get(f.id, []),
         )
 
     for chain in chains:
@@ -55,6 +65,10 @@ def build_graph(
                     src, dst,
                     chain_id=chain.id,
                     priority=chain.priority,
+                    step_index=i,
+                    cross_layer=G.nodes[src].get("layer") != G.nodes[dst].get("layer"),
+                    source_layer=G.nodes[src].get("layer"),
+                    target_layer=G.nodes[dst].get("layer"),
                     label=f"chain-{chain.id[:8]}",
                 )
 

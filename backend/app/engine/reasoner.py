@@ -109,9 +109,24 @@ async def stream_reasoning(findings: list[Finding], on_token, target: dict | Non
             step_ids = [findings[i].id for i in indices if isinstance(i, int) and i < len(findings)]
             if not step_ids:
                 continue
+            ordered = [findings[i] for i in indices if isinstance(i, int) and i < len(findings)]
+            raw_reasoning = c.get("reasoning") or c.get("rationale") or data.get("reasoning", "")
+            if isinstance(raw_reasoning, str):
+                reasoning_items = raw_reasoning.splitlines()
+            elif isinstance(raw_reasoning, list):
+                reasoning_items = raw_reasoning
+            else:
+                reasoning_items = []
+
             chain = Chain(
                 steps=step_ids,
                 narrative=c.get("narrative", ""),
+                layer_path=_layer_path(ordered),
+                reasoning=[str(item) for item in reasoning_items if str(item).strip()] or _chain_reasoning(ordered, {
+                    "exploitability": float(c.get("exploitability", 0.5)),
+                    "impact": float(c.get("impact", 0.5)),
+                    "novelty": float(c.get("novelty", 0.5)),
+                }),
                 exploitability=float(c.get("exploitability", 0.5)),
                 impact=float(c.get("impact", 0.5)),
                 novelty=float(c.get("novelty", 0.5)),
@@ -140,21 +155,97 @@ WEB_LAYERS = {1}
 AI_LAYERS = {2, 3, 4, 7}
 INFRA_LAYERS = {5, 6, 8}
 
+_LAYER_NAMES = {
+    1: "Web", 2: "LLM", 3: "RAG", 4: "MCP/Agentic",
+    5: "Network", 6: "Supply Chain", 7: "Multi-Agent", 8: "Identity",
+}
+
+_LAYER_REMEDIATION = {
+    1: "Constrain web inputs and outputs before they can reach downstream AI or data flows.",
+    2: "Add prompt-injection filtering, strict system prompt separation, and schema-constrained outputs.",
+    3: "Sign trusted documents, quarantine untrusted retrieval sources, and detect embedding outliers.",
+    4: "Require per-tool authorization, argument validation, and least-privilege tool scopes.",
+    5: "Segment internal services and block scanner-discovered pivots with egress controls.",
+    6: "Pin and audit dependencies, verify package provenance, and block vulnerable builds.",
+    7: "Authenticate inter-agent messages and isolate compromised agents from broadcast channels.",
+    8: "Rotate exposed credentials and move tokens out of URLs/loggable channels.",
+}
+
+
+def _layer_path(ordered: list[Finding]) -> list[int]:
+    path: list[int] = []
+    for finding in ordered:
+        if finding.layer not in path:
+            path.append(finding.layer)
+    return path
+
+
+def _domain_name(layer: int) -> str:
+    if layer in WEB_LAYERS:
+        return "web"
+    if layer in AI_LAYERS:
+        return "AI/agentic"
+    if layer in INFRA_LAYERS:
+        return "infra/identity"
+    return "unknown"
+
+
+def _chain_reasoning(ordered: list[Finding], metrics: dict[str, float]) -> list[str]:
+    path = _layer_path(ordered)
+    domains = []
+    for layer in path:
+        domain = _domain_name(layer)
+        if domain not in domains:
+            domains.append(domain)
+
+    reasoning = [
+        f"Path crosses {len(path)} layer(s): " + " -> ".join(f"L{layer} {_LAYER_NAMES.get(layer, '')}".strip() for layer in path),
+        f"Security domains touched: {', '.join(domains)}",
+        f"Priority is driven by exploitability={metrics['exploitability']:.2f}, impact={metrics['impact']:.2f}, novelty={metrics['novelty']:.2f}",
+    ]
+    if len(domains) >= 2:
+        reasoning.append("Cross-domain movement means siloed web, AI, or infra tools are unlikely to explain the full path.")
+    if any(f.severity in {"critical", "high"} for f in ordered):
+        reasoning.append("High-severity steps should be remediated first to break the chain early.")
+    return reasoning
+
+
+def _attacker_narrative(ordered: list[Finding]) -> str:
+    if len(ordered) == 1:
+        f = ordered[0]
+        return f"Attacker abuses L{f.layer} {_LAYER_NAMES.get(f.layer, 'layer')} weakness: {f.title}."
+
+    first = ordered[0]
+    last = ordered[-1]
+    hops = " -> ".join(f"L{f.layer} {_LAYER_NAMES.get(f.layer, '')}".strip() for f in ordered)
+    return (
+        f"Attacker starts with {first.title} in L{first.layer}, then pivots through {hops}, "
+        f"ending at L{last.layer} impact: {last.title}."
+    )
+
 
 def _build_chain(ordered: list[Finding], on_token) -> Chain | None:
     if not ordered:
         return None
     layers_hit = {f.layer for f in ordered}
-    narrative = " -> ".join(f"L{f.layer}: {f.title}" for f in ordered)
+    layer_path = _layer_path(ordered)
+    narrative = _attacker_narrative(ordered)
 
     # Single source of truth for scoring (see engine/scorer.py). Because the layers
     # now produce target-derived confidences, these metrics vary per target.
     m = compute_chain_metrics(ordered)
 
-    remediations = [
-        Remediation(layer=f.layer, action=f"Mitigate: {f.title}", ref=f.owasp_ref or f.mitre_ref or "N/A")
-        for f in ordered if (f.owasp_ref or f.mitre_ref)
-    ]
+    remediations: list[Remediation] = []
+    seen_layers: set[int] = set()
+    for f in ordered:
+        if f.layer in seen_layers:
+            continue
+        seen_layers.add(f.layer)
+        remediations.append(Remediation(
+            layer=f.layer,
+            action=_LAYER_REMEDIATION.get(f.layer, f"Mitigate: {f.title}"),
+            ref=f.owasp_ref or f.mitre_ref or "N/A",
+        ))
 
     on_token(f"[ARGUS] Chain ({len(layers_hit)} layers): {narrative}\n")
     on_token(
@@ -165,19 +256,14 @@ def _build_chain(ordered: list[Finding], on_token) -> Chain | None:
     return Chain(
         steps=[f.id for f in ordered],
         narrative=narrative,
+        layer_path=layer_path,
+        reasoning=_chain_reasoning(ordered, m),
         exploitability=m["exploitability"],
         impact=m["impact"],
         novelty=m["novelty"],
         priority=m["priority"],
         remediations=remediations,
     )
-
-
-_LAYER_NAMES = {
-    1: "Web", 2: "LLM", 3: "RAG", 4: "MCP/Agentic",
-    5: "Network", 6: "Supply Chain", 7: "Multi-Agent", 8: "Identity",
-}
-
 
 def _heuristic_chains(findings: list[Finding], on_token) -> list[Chain]:
     exploitable = [f for f in findings if f.exploitable]

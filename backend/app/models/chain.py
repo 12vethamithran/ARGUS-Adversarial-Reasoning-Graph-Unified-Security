@@ -16,6 +16,8 @@ class Chain(BaseModel):
     id: str = Field(default_factory=lambda: str(ULID()))
     steps: list[str] = Field(description="Ordered list of Finding IDs")
     narrative: str = Field(description="Human-readable attack story")
+    layer_path: list[int] = Field(default_factory=list, description="Ordered layer IDs represented by steps")
+    reasoning: list[str] = Field(default_factory=list, description="Short reasoning trace for why the chain matters")
     exploitability: float = Field(ge=0.0, le=1.0)
     impact: float = Field(ge=0.0, le=1.0)
     novelty: float = Field(
@@ -29,6 +31,8 @@ class Chain(BaseModel):
         "id": "01HW...",
         "steps": ["01HW_finding_1", "01HW_finding_2"],
         "narrative": "Attacker injects prompt via L1 web form -> LLM executes L5 network call",
+        "layer_path": [1, 2, 5],
+        "reasoning": ["Initial access reaches model context", "Agent action creates internal network impact"],
         "exploitability": 0.82,
         "impact": 0.91,
         "novelty": 0.74,
