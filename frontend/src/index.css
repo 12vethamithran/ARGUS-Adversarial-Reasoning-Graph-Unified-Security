@@ -108,6 +108,20 @@ html { background: rgb(var(--bg)); scroll-behavior: smooth; }
 
 .landing-slide { scroll-margin-top: 74px; }
 
+.chain-motion-box,
+.argus-chain-panel,
+.argus-chain-viewport {
+  contain: layout paint;
+}
+
+.chain-motion-box { overflow: clip; }
+
+.argus-chain-panel,
+.argus-chain-viewport {
+  box-sizing: border-box;
+  max-inline-size: 100%;
+}
+
 .chain-hero-field {
   background-image:
     radial-gradient(circle at 78% 45%, rgb(var(--accent) / 0.08), transparent 34%),

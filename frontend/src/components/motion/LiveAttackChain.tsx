@@ -3,15 +3,15 @@ import { motion, useReducedMotion } from "framer-motion";
 import { LiveDot } from "./ArgusMotion";
 
 const NODES = [
-  { label: "Web", detail: "Input", Icon: Globe, x: 54, y: 92 },
+  { label: "Web", detail: "Input", Icon: Globe, x: 68, y: 92 },
   { label: "LLM", detail: "Prompt", Icon: Bot, x: 174, y: 52 },
   { label: "RAG", detail: "Corpus", Icon: Database, x: 300, y: 98 },
   { label: "MCP", detail: "Tool", Icon: Wrench, x: 426, y: 58 },
   { label: "Net", detail: "Pivot", Icon: Network, x: 548, y: 104 },
-  { label: "Risk", detail: "Chain", Icon: ShieldAlert, x: 664, y: 66 },
+  { label: "Risk", detail: "Chain", Icon: ShieldAlert, x: 650, y: 66 },
 ];
 
-const PATH = "M54 92 C98 34 128 28 174 52 S250 126 300 98 S376 28 426 58 S504 132 548 104 S616 34 664 66";
+const PATH = "M68 92 C108 34 134 28 174 52 S250 126 300 98 S376 28 426 58 S504 132 548 104 S612 34 650 66";
 const PACKET_X = NODES.map((node) => node.x);
 const PACKET_Y = NODES.map((node) => node.y);
 
@@ -19,7 +19,7 @@ export function LiveAttackChain() {
   const reducedMotion = useReducedMotion();
 
   return (
-    <div className="argus-panel-shell relative overflow-hidden rounded-lg border border-accent/25 bg-surface/60 p-4 md:p-5 shadow-[0_0_42px_rgb(var(--accent)/0.08)]">
+    <div className="argus-panel-shell argus-chain-panel relative isolate w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-accent/25 bg-surface/60 p-4 md:p-5 shadow-[0_0_42px_rgb(var(--accent)/0.08)]">
       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgb(var(--accent)/0.12),transparent_38%,rgb(var(--accent)/0.06))]" />
       <motion.div
         aria-hidden
@@ -46,7 +46,7 @@ export function LiveAttackChain() {
           </motion.span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] gap-2">
           {[
             ["entry", "web input"],
             ["pivot", "agent tool"],
@@ -66,7 +66,7 @@ export function LiveAttackChain() {
           ))}
         </div>
 
-        <div className="relative h-56 overflow-hidden rounded-md border border-line/10 bg-bg/55">
+        <div className="argus-chain-viewport relative h-56 min-w-0 max-w-full overflow-hidden rounded-md border border-line/10 bg-bg/55">
           <div className="argus-workspace-grid absolute inset-0 opacity-60" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent,rgb(var(--accent)/0.07)_52%,transparent)]" />
           {!reducedMotion && (
