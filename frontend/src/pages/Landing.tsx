@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
+import { useEffect, useState, type CSSProperties } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
@@ -176,21 +176,17 @@ function useClock() {
 }
 
 function ChainHero({ onEnter }: Props) {
-  const sectionRef = useRef<HTMLElement>(null);
   const reducedMotion = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
-  const progress = useSpring(scrollYProgress, { stiffness: 90, damping: 24, mass: 0.45 });
-  const copyY = useTransform(progress, [0, 0.5, 1], reducedMotion ? [0, 0, 0] : [70, 0, -34]);
-  const visualY = useTransform(progress, [0, 0.5, 1], reducedMotion ? [0, 0, 0] : [110, 0, -55]);
-  const visualRotate = useTransform(progress, [0, 0.5, 1], reducedMotion ? [0, 0, 0] : [1.5, 0, -1.5]);
 
   return (
-    <section ref={sectionRef} className="landing-slide relative overflow-hidden px-6 md:px-10 py-24 md:py-32 min-h-[92vh] flex items-center">
+    <section className="landing-slide relative overflow-hidden px-6 md:px-10 py-24 md:py-32 min-h-[92vh] flex items-center">
       <div className="absolute inset-0 chain-hero-field" aria-hidden />
       <motion.div aria-hidden className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent"
-        style={{ scaleX: progress, transformOrigin: "left" }} />
+        initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true, amount: 0.15 }}
+        transition={{ duration: 1.15, ease: [0.16, 1, 0.3, 1] }} style={{ transformOrigin: "left" }} />
       <div className="relative z-10 grid w-full max-w-[1600px] mx-auto gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(480px,680px)] lg:items-center">
-        <motion.div style={{ y: copyY }}>
+        <motion.div initial={reducedMotion ? false : { opacity: 0, x: -64 }} whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}>
           <WordReveal className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-5xl"
             tokens={["Security", "that", { w: "sees", accent: true }, "\n", "every", "attack", "chain."]} />
           <motion.p initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }}
@@ -205,7 +201,10 @@ function ChainHero({ onEnter }: Props) {
             <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted whitespace-nowrap">SCROLL TO TRACE THE SIGNAL</span>
           </motion.div>
         </motion.div>
-        <motion.div style={{ y: visualY, rotate: visualRotate }}><LiveAttackChain /></motion.div>
+        <motion.div initial={reducedMotion ? false : { opacity: 0, x: 72, scale: 0.96 }} whileInView={{ opacity: 1, x: 0, scale: 1 }}
+          viewport={{ once: true, amount: 0.18 }} transition={{ duration: 1, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}>
+          <LiveAttackChain />
+        </motion.div>
       </div>
     </section>
   );
@@ -221,7 +220,7 @@ export function Landing({ onEnter }: Props) {
   const clock = useClock();
 
   return (
-    <div className="landing-scroll accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
+    <div className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-5 border-b border-line/10 bg-bg/80 backdrop-blur-xl">
         <div className="flex items-center gap-5">

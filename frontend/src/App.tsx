@@ -47,7 +47,7 @@ export default function App() {
       )}
       <AnimatePresence mode="wait">
         {view === "landing" && (
-          <motion.div key="landing" {...PAGE_VARIANTS} transition={{ duration: 0.3 }} className="flex-1 overflow-y-auto">
+          <motion.div key="landing" {...PAGE_VARIANTS} transition={{ duration: 0.3 }} className="landing-scroll-container flex-1 overflow-x-hidden overflow-y-auto">
             <Landing onEnter={() => goTo("onboarding")} />
           </motion.div>
         )}

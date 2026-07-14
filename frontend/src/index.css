@@ -99,13 +99,14 @@
 
 html { background: rgb(var(--bg)); scroll-behavior: smooth; }
 
-.landing-scroll {
-  scroll-snap-type: y proximity;
-  scroll-padding-top: 74px;
-  overscroll-behavior-y: contain;
+.landing-scroll-container {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
-.landing-slide { scroll-snap-align: start; scroll-snap-stop: normal; }
+.landing-slide { scroll-margin-top: 74px; }
 
 .chain-hero-field {
   background-image:
@@ -304,7 +305,7 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 /* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .landing-scroll { scroll-snap-type: none; }
+  .landing-scroll-container { scroll-behavior: auto; }
   .halftone-text, .halftone-breathe, .aurora, .ascii-hero { animation: none !important; }
 }
 
