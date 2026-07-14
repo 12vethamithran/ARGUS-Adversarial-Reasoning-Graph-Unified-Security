@@ -99,6 +99,34 @@
 
 html { background: rgb(var(--bg)); scroll-behavior: smooth; }
 
+.landing-scroll {
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 74px;
+  overscroll-behavior-y: contain;
+}
+
+.landing-slide { scroll-snap-align: start; scroll-snap-stop: normal; }
+
+.chain-hero-field {
+  background-image:
+    radial-gradient(circle at 78% 45%, rgb(var(--accent) / 0.08), transparent 34%),
+    linear-gradient(90deg, transparent 49.9%, rgb(var(--border) / 0.08) 50%, transparent 50.1%);
+  background-size: auto, 92px 100%;
+  mask-image: linear-gradient(to bottom, transparent, black 16%, black 84%, transparent);
+}
+
+.system-radar { opacity: 0.9; }
+.system-radar-ring { position: absolute; inset: 0; border: 1px solid rgb(var(--accent) / 0.16); border-radius: 50%; }
+.system-radar-ring--inner { inset: 26%; border-color: rgb(var(--accent) / 0.28); }
+.system-radar-ring--outer { background: repeating-radial-gradient(circle, transparent 0 24px, rgb(var(--accent) / 0.05) 25px 26px); }
+.system-radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 82%, rgb(var(--accent) / 0.32) 96%, transparent 100%);
+  mask-image: radial-gradient(circle, transparent 0 7%, black 8% 100%);
+}
+
 body {
   background: rgb(var(--bg));
   color: rgb(var(--text));
@@ -275,6 +303,8 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 
 /* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .landing-scroll { scroll-snap-type: none; }
   .halftone-text, .halftone-breathe, .aurora, .ascii-hero { animation: none !important; }
 }
 

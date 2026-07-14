@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Bot, GitBranch, Radar, ShieldCheck } from "lucide-react";
+import { Bot, Crosshair, GitBranch, Radar, ShieldCheck } from "lucide-react";
 import { LiveDot } from "./ArgusMotion";
 
 const FEATURES = [
@@ -16,6 +16,12 @@ export function SystemReveal() {
   return (
     <div className="relative overflow-hidden">
       <div className="absolute inset-0 argus-workspace-grid opacity-25" aria-hidden />
+      <div className="system-radar pointer-events-none absolute right-[3%] top-[8%] hidden h-64 w-64 md:block" aria-hidden>
+        <span className="system-radar-ring system-radar-ring--outer" />
+        <span className="system-radar-ring system-radar-ring--inner" />
+        <motion.span className="system-radar-sweep" animate={reducedMotion ? undefined : { rotate: 360 }} transition={{ duration: 5.5, repeat: Infinity, ease: "linear" }} />
+        <Crosshair className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-accent/55" />
+      </div>
       <motion.div
         aria-hidden
         className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-accent/55 to-transparent"
@@ -60,6 +66,11 @@ export function SystemReveal() {
             <Bot className="h-4 w-4 text-accent" />
             Adversarial Reasoning Graph Unified Security
           </motion.div>
+          <div className="mt-5 flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.18em] text-text-muted">
+            <span className="text-accent">Signal acquired</span>
+            <span className="h-px w-16 bg-accent/35" />
+            <motion.span animate={reducedMotion ? undefined : { opacity: [0.35, 1, 0.35] }} transition={{ duration: 2.2, repeat: Infinity }}>8-layer reasoning mesh online</motion.span>
+          </div>
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}

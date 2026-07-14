@@ -1,5 +1,5 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
@@ -175,6 +175,42 @@ function useClock() {
   return t;
 }
 
+function ChainHero({ onEnter }: Props) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
+  const progress = useSpring(scrollYProgress, { stiffness: 90, damping: 24, mass: 0.45 });
+  const copyY = useTransform(progress, [0, 0.5, 1], reducedMotion ? [0, 0, 0] : [70, 0, -34]);
+  const visualY = useTransform(progress, [0, 0.5, 1], reducedMotion ? [0, 0, 0] : [110, 0, -55]);
+  const visualRotate = useTransform(progress, [0, 0.5, 1], reducedMotion ? [0, 0, 0] : [1.5, 0, -1.5]);
+
+  return (
+    <section ref={sectionRef} className="landing-slide relative overflow-hidden px-6 md:px-10 py-24 md:py-32 min-h-[92vh] flex items-center">
+      <div className="absolute inset-0 chain-hero-field" aria-hidden />
+      <motion.div aria-hidden className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent"
+        style={{ scaleX: progress, transformOrigin: "left" }} />
+      <div className="relative z-10 grid w-full max-w-[1600px] mx-auto gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(480px,680px)] lg:items-center">
+        <motion.div style={{ y: copyY }}>
+          <WordReveal className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-5xl"
+            tokens={["Security", "that", { w: "sees", accent: true }, "\n", "every", "attack", "chain."]} />
+          <motion.p initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }}
+            transition={{ delay: 0.18, duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="mt-8 max-w-xl text-text-secondary leading-relaxed">
+            Adversarial reasoning across eight layers, modeling how a web injection feeds an LLM that poisons a RAG corpus and hijacks an agent.
+          </motion.p>
+          <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }}
+            transition={{ delay: 0.28, duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="mt-10 flex flex-wrap items-center gap-5">
+            <button onClick={onEnter} className="group flex items-center gap-3 px-7 py-4 rounded-full bg-accent text-[rgb(var(--accent-contrast))] font-medium tracking-wide hover:opacity-90 transition-all">
+              DISCOVER ARGUS <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
+            </button>
+            <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted whitespace-nowrap">SCROLL TO TRACE THE SIGNAL</span>
+          </motion.div>
+        </motion.div>
+        <motion.div style={{ y: visualY, rotate: visualRotate }}><LiveAttackChain /></motion.div>
+      </div>
+    </section>
+  );
+}
+
 // Drifting particle cluster (Furo problem-section motif).
 interface Props { onEnter: () => void }
 
@@ -185,7 +221,7 @@ export function Landing({ onEnter }: Props) {
   const clock = useClock();
 
   return (
-    <div className="accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
+    <div className="landing-scroll accent-reactive relative min-h-screen bg-bg text-text-primary overflow-x-hidden" style={rootStyle}>
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-5 border-b border-line/10 bg-bg/80 backdrop-blur-xl">
         <div className="flex items-center gap-5">
@@ -205,7 +241,7 @@ export function Landing({ onEnter }: Props) {
       </nav>
 
       {/* ── HERO 1: ARGUS name + feature reveal ── */}
-      <header className="relative overflow-hidden px-6 md:px-10 py-16 md:py-20 min-h-[86vh] flex items-center border-b border-line/10">
+      <header className="landing-slide relative overflow-hidden px-6 md:px-10 py-16 md:py-20 min-h-[92vh] flex items-center border-b border-line/10">
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent" aria-hidden />
         <div className="relative z-10 w-full max-w-[1600px] mx-auto">
           <SystemReveal />
@@ -213,7 +249,8 @@ export function Landing({ onEnter }: Props) {
       </header>
 
       {/* ── HERO 2: live attack-chain motion ── */}
-      <section className="relative px-6 md:px-10 py-20 md:py-24 max-w-[1600px] mx-auto">
+      <ChainHero onEnter={onEnter} />
+      <section className="hidden">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(440px,620px)] lg:items-center">
           <div>
             <WordReveal
@@ -429,7 +466,7 @@ export function Landing({ onEnter }: Props) {
 }
 
 function Section({ children, id }: { children: React.ReactNode; id?: string }) {
-  return <section id={id} className="cv-section relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">{children}</section>;
+  return <section id={id} className="landing-slide cv-section relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">{children}</section>;
 }
 
 function ModeCard({ onHover, onLeave, onClick, accent, Icon, name, tag, points, ideal }: {

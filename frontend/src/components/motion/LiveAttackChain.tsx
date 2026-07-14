@@ -179,6 +179,13 @@ export function LiveAttackChain() {
               </motion.div>
             ))}
           </div>
+          <div className="pointer-events-none absolute bottom-2 left-3 right-3 flex items-center gap-2 font-mono text-[8px] uppercase tracking-[0.16em] text-text-muted">
+            <span className="text-accent">Trace 01</span>
+            <span className="relative h-px flex-1 overflow-hidden bg-line/15">
+              <motion.span className="absolute inset-y-0 left-0 bg-accent" animate={reducedMotion ? { width: "100%" } : { width: ["0%", "100%"] }} transition={{ duration: 5.2, repeat: Infinity, ease: "linear" }} />
+            </span>
+            <motion.span animate={reducedMotion ? undefined : { opacity: [0.35, 1, 0.35] }} transition={{ duration: 1.4, repeat: Infinity }}>Reasoning live</motion.span>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
