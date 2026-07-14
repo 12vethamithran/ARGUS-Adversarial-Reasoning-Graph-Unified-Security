@@ -570,18 +570,30 @@ def _build_plain_pdf(out: Path, context: dict[str, Any], renderer_note: str) -> 
 
     lines = [
         "ARGUS Analyst Attack Report",
-        f"Target: {target.get('description') or target.get('url') or 'Unknown target'}",
+        f"Target: {context.get('target_label') or target.get('description') or target.get('url') or 'Unknown target'}",
         f"Generated: {context.get('generated_at')}",
         f"Overall rating: {context.get('risk_rating')} ({context.get('risk_score', 0)}/100)",
         str(context.get("analyst_verdict") or ""),
-        f"Renderer note: {renderer_note}",
+        "",
+        "Executive Overview",
+    ]
+    lines.extend(f"- {item}" for item in context.get("executive_summary") or [])
+    lines.extend([
+        "",
+        "Scope and Methodology",
+        f"- Target: {context.get('target_label') or 'Unknown target'}",
+        f"- Mode: {target.get('mode', 'unknown')}",
+        f"- Domains hit: {', '.join(context.get('domains_hit') or []) or 'No domains recorded'}",
+    ])
+    lines.extend(f"- {item}" for item in context.get("methodology_notes") or [])
+    lines.extend([
         "",
         "Severity Distribution",
-    ]
+    ])
     lines.extend(f"- {severity.upper()}: {counts.get(severity, 0)}" for severity in ["critical", "high", "medium", "low", "info"])
     lines.extend(["", "Layer Coverage"])
     for row in layer_summary:
-        highest = (row.get("highest") or {}).get("title", "None")
+        highest = (row.get("highest") or {}).get("title", "No finding")
         lines.append(
             f"- L{row.get('layer')} {row.get('name')}: {row.get('count', 0)} finding(s), "
             f"{row.get('exploitable', 0)} exploitable, highest: {highest}"
@@ -592,6 +604,8 @@ def _build_plain_pdf(out: Path, context: dict[str, Any], renderer_note: str) -> 
     for chain in chains:
         lines.append(f"Chain {chain.get('index')}: {chain.get('rating')} - priority {chain.get('priority_pct')}%")
         lines.extend(_wrap_line(chain.get("narrative"), 92))
+        lines.extend(_wrap_line(f"Path: {chain.get('path_label')}", 92))
+        lines.extend(_wrap_line(f"Reasoning: {chain.get('reasoning_summary')}", 92))
         lines.append(
             f"Exploitability {chain.get('exploitability_pct')}% | "
             f"Impact {chain.get('impact_pct')}% | Novelty {chain.get('novelty_pct')}%"
@@ -607,7 +621,17 @@ def _build_plain_pdf(out: Path, context: dict[str, Any], renderer_note: str) -> 
                 88,
             ))
         lines.append("")
-    lines.extend(["Finding Detail and Analyst Rating"])
+    lines.extend(["", "Remediation Priority Plan"])
+    top_chain = context.get("top_chain")
+    if top_chain and top_chain.get("remediations"):
+        for idx, remediation in enumerate(top_chain.get("remediations") or [], start=1):
+            lines.extend(_wrap_line(
+                f"{idx}. L{remediation.get('layer')}: {remediation.get('action')} [{remediation.get('ref')}]",
+                92,
+            ))
+    else:
+        lines.append("No chain-specific remediation plan was generated. Address exploitable critical and high findings first.")
+    lines.extend(["", "Finding Detail and Analyst Rating"])
     for finding in findings:
         lines.append(f"- {finding.get('title')} - {str(finding.get('severity', '')).upper()}")
         lines.append(
