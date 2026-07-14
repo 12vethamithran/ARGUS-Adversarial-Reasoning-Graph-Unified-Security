@@ -82,7 +82,8 @@ def test_report_context_and_template_are_structured_and_spacing_safe():
         audit_log=[],
     )
 
-    template = Path("backend/app/templates/report.html.j2").read_text()
+    template_path = Path(__file__).resolve().parents[1] / "app" / "templates" / "report.html.j2"
+    template = template_path.read_text(encoding="utf-8")
 
     assert "Structured Analyst Threat Report" in template
     assert "Scope and Methodology" in template
