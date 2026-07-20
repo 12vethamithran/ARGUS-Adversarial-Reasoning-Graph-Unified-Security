@@ -1,5 +1,5 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
@@ -94,6 +94,7 @@ const PROBLEM_LINES = [
 function ProblemBand() {
   return (
     <section className="landing-slide cv-section relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
+      <SlideIn>
       <Reveal>
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
@@ -124,6 +125,7 @@ function ProblemBand() {
           ))}
         </div>
       </div>
+      </SlideIn>
     </section>
   );
 }
@@ -149,6 +151,46 @@ function DriftParticles() {
           </motion.span>
         ))}
       </motion.div>
+    </motion.div>
+  );
+}
+
+// Scroll-linked sideways slide: as the wrapped block scrolls into view it
+// translates in horizontally (dir = 1 from the right, -1 from the left),
+// eased through a spring so it glides rather than tracking 1:1. Progress is
+// driven by a scroll listener on the app scroll container (found via
+// closest(), since the container ref isn't attached when child effects run).
+function SlideIn({ children, dir = 1, className }: { children: React.ReactNode; dir?: 1 | -1; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
+  const progress = useMotionValue(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || reducedMotion) return;
+    const scroller = el.closest(".landing-scroll-container") as HTMLElement | null;
+    const update = () => {
+      const vh = scroller ? scroller.clientHeight : window.innerHeight;
+      const top = el.getBoundingClientRect().top;
+      // 0 while the block's top is below the viewport, 1 once it reaches 45% height
+      const p = (vh - top) / (vh * 0.55);
+      progress.set(Math.min(1, Math.max(0, p)));
+    };
+    update();
+    const target: HTMLElement | Window = scroller ?? window;
+    target.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      target.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [progress, reducedMotion]);
+  const eased = useSpring(progress, { stiffness: 110, damping: 24, mass: 0.4 });
+  const x = useTransform(eased, [0, 1], [`${dir * 34}%`, "0%"]);
+  const opacity = useTransform(eased, [0, 0.9], [0, 1]);
+  if (reducedMotion) return <div className={className}>{children}</div>;
+  return (
+    <motion.div ref={ref} className={className} style={{ x, opacity, willChange: "transform" }}>
+      {children}
     </motion.div>
   );
 }
@@ -257,6 +299,7 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── MARQUEE ── */}
       <section className="landing-slide relative py-9 border-y border-line/10 bg-surface/40">
+        <SlideIn dir={-1}>
         <p className="text-center text-text-muted text-xs font-mono uppercase tracking-[0.25em] mb-6">Eight layers · one campaign</p>
         <div className="marquee-mask overflow-hidden">
           <div className="marquee-track">
@@ -269,10 +312,11 @@ export function Landing({ onEnter }: Props) {
             ))}
           </div>
         </div>
+        </SlideIn>
       </section>
 
       {/* ── LAYERS (big serif-italic title + grid) ── */}
-      <Section id="layers">
+      <Section id="layers" dir={-1}>
         <Reveal>
           <h2 className="font-serif-display text-6xl md:text-[9rem] leading-none text-center">
             <span className="serif-italic">LAYERS</span>
@@ -313,18 +357,18 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── STATS BAND ── */}
       <section className="landing-slide cv-section relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
-        <div className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
+        <SlideIn dir={-1} className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
           {STATS.map((s, i) => (
             <Reveal key={s.l} delay={i * 0.06} className="text-center">
               <p className="font-serif-display text-6xl md:text-8xl leading-none text-accent">{s.v}</p>
               <p className="text-text-muted text-sm mt-3">{s.l}</p>
             </Reveal>
           ))}
-        </div>
+        </SlideIn>
       </section>
 
       {/* ── ATTACK-CHAIN SHOWCASE ── */}
-      <Section id="chain">
+      <Section id="chain" dir={-1}>
         <Reveal>
           <p className="text-accent text-xs font-mono uppercase tracking-[0.25em]">The emergent threat</p>
           <h2 className="mt-5 font-serif-display text-4xl md:text-7xl leading-[1.05] max-w-4xl">
@@ -392,7 +436,7 @@ export function Landing({ onEnter }: Props) {
       </Section>
 
       {/* ── MODES ── */}
-      <Section id="modes">
+      <Section id="modes" dir={-1}>
         <Reveal><p className="text-accent text-xs font-mono uppercase tracking-[0.25em]">Choose your depth</p></Reveal>
         <div className="mt-10 grid md:grid-cols-2 gap-5">
           <ModeCard onHover={() => setMode("basic")} onLeave={() => setMode("neutral")} onClick={onEnter}
@@ -406,6 +450,7 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── CTA ── */}
       <section className="landing-slide cv-section relative px-6 md:px-10 py-32 text-center border-t border-line/10">
+        <SlideIn>
         <Reveal>
           <h2 className="font-serif-display text-5xl md:text-8xl leading-[1.02] mb-10">
             Reason about your<br /><span className="serif-italic">attack surface.</span>
@@ -416,6 +461,7 @@ export function Landing({ onEnter }: Props) {
           </button>
           <p className="text-text-muted text-sm mt-8 font-mono">Only test targets you own or are authorized to assess.</p>
         </Reveal>
+        </SlideIn>
       </section>
 
       {/* ── FOOTER ── */}
@@ -429,8 +475,12 @@ export function Landing({ onEnter }: Props) {
   );
 }
 
-function Section({ children, id }: { children: React.ReactNode; id?: string }) {
-  return <section id={id} className="landing-slide cv-section relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">{children}</section>;
+function Section({ children, id, dir = 1 }: { children: React.ReactNode; id?: string; dir?: 1 | -1 }) {
+  return (
+    <section id={id} className="landing-slide cv-section relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">
+      <SlideIn dir={dir}>{children}</SlideIn>
+    </section>
+  );
 }
 
 function ModeCard({ onHover, onLeave, onClick, accent, Icon, name, tag, points, ideal }: {
