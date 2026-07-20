@@ -99,14 +99,25 @@
 
 html { background: rgb(var(--bg)); scroll-behavior: smooth; }
 
+/* Slide scrolling: each .landing-slide snaps into place as you scroll.
+   `proximity` (not `mandatory`) so sections taller than the viewport can
+   still be scrolled through freely instead of trapping the user. */
 .landing-scroll-container {
   scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
   overscroll-behavior-y: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
 
-.landing-slide { scroll-margin-top: 74px; }
+.landing-slide {
+  scroll-margin-top: 74px;
+  scroll-snap-align: start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-scroll-container { scroll-snap-type: none; }
+}
 
 .chain-motion-box,
 .argus-chain-panel,

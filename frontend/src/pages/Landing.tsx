@@ -93,7 +93,7 @@ const PROBLEM_LINES = [
 // enter; the particle cloud quietly drifts and condenses on a loop.
 function ProblemBand() {
   return (
-    <section className="cv-section relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
+    <section className="landing-slide cv-section relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
       <Reveal>
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
@@ -256,7 +256,7 @@ export function Landing({ onEnter }: Props) {
       <ProblemBand />
 
       {/* ── MARQUEE ── */}
-      <section className="relative py-9 border-y border-line/10 bg-surface/40">
+      <section className="landing-slide relative py-9 border-y border-line/10 bg-surface/40">
         <p className="text-center text-text-muted text-xs font-mono uppercase tracking-[0.25em] mb-6">Eight layers · one campaign</p>
         <div className="marquee-mask overflow-hidden">
           <div className="marquee-track">
@@ -312,7 +312,7 @@ export function Landing({ onEnter }: Props) {
       </Section>
 
       {/* ── STATS BAND ── */}
-      <section className="cv-section relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
+      <section className="landing-slide cv-section relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
         <div className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
           {STATS.map((s, i) => (
             <Reveal key={s.l} delay={i * 0.06} className="text-center">
@@ -405,7 +405,7 @@ export function Landing({ onEnter }: Props) {
       </Section>
 
       {/* ── CTA ── */}
-      <section className="cv-section relative px-6 md:px-10 py-32 text-center border-t border-line/10">
+      <section className="landing-slide cv-section relative px-6 md:px-10 py-32 text-center border-t border-line/10">
         <Reveal>
           <h2 className="font-serif-display text-5xl md:text-8xl leading-[1.02] mb-10">
             Reason about your<br /><span className="serif-italic">attack surface.</span>
