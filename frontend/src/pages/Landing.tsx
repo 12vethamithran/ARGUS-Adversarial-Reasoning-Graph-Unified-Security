@@ -56,6 +56,7 @@ const APART = [
 // tokens: a string word, "\n" for a line break, or { w, accent } for an italic accent word.
 type Token = string | { w: string; accent: true };
 function WordReveal({ tokens, className }: { tokens: Token[]; className?: string }) {
+  const reducedMotion = useReducedMotion();
   let idx = 0;
   return (
     <h2 className={className}>
@@ -67,7 +68,7 @@ function WordReveal({ tokens, className }: { tokens: Token[]; className?: string
         return (
           <span key={i} className="inline-block overflow-hidden align-bottom mr-[0.25em] pb-[0.12em]">
             <motion.span className={`inline-block ${isAccent ? "serif-italic" : ""}`}
-              initial={{ y: "110%" }}
+              initial={reducedMotion ? false : { y: "110%" }}
               whileInView={{ y: 0 }}
               viewport={{ once: true, margin: "-90px" }}
               transition={{ duration: 0.75, delay, ease: [0.16, 1, 0.3, 1] }}>
@@ -129,8 +130,8 @@ function ProblemBand() {
 
 // Self-contained looping particle cluster — gentle breathe + rotate, no scroll dependency.
 function DriftParticles() {
-  const dots = Array.from({ length: 70 }, (_, i) => {
-    const a = (i / 70) * Math.PI * 2 * 3;
+  const dots = Array.from({ length: 42 }, (_, i) => {
+    const a = (i / 42) * Math.PI * 2 * 3;
     const r = 18 + (i % 12) * 9;
     return { x: Math.cos(a) * r, y: Math.sin(a) * r, i };
   });
@@ -153,12 +154,13 @@ function DriftParticles() {
 }
 
 function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const reducedMotion = useReducedMotion();
   return (
     <motion.div className={className}
-      initial={{ opacity: 0, y: 56, filter: "blur(6px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      initial={reducedMotion ? false : { opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-90px" }}
-      transition={{ duration: 0.85, delay, ease: [0.16, 1, 0.3, 1] }}>
+      transition={{ duration: 0.75, delay, ease: [0.16, 1, 0.3, 1] }}>
       {children}
     </motion.div>
   );
@@ -179,7 +181,7 @@ function ChainHero({ onEnter }: Props) {
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="landing-slide relative overflow-hidden px-6 md:px-10 py-24 md:py-32 min-h-[92vh] flex items-center">
+    <section className="landing-slide relative overflow-hidden px-6 md:px-10 py-24 md:py-32 min-h-[92svh] flex items-center">
       <div className="absolute inset-0 chain-hero-field" aria-hidden />
       <motion.div aria-hidden className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent"
         initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true, amount: 0.15 }}
@@ -240,7 +242,7 @@ export function Landing({ onEnter }: Props) {
       </nav>
 
       {/* ── HERO 1: ARGUS name + feature reveal ── */}
-      <header className="landing-slide relative overflow-hidden px-6 md:px-10 py-16 md:py-20 min-h-[92vh] flex items-center border-b border-line/10">
+      <header className="landing-slide relative overflow-hidden px-6 md:px-10 py-16 md:py-20 min-h-[92svh] flex items-center border-b border-line/10">
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent" aria-hidden />
         <div className="relative z-10 w-full max-w-[1600px] mx-auto">
           <SystemReveal />
@@ -249,43 +251,6 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── HERO 2: live attack-chain motion ── */}
       <ChainHero onEnter={onEnter} />
-      <section className="hidden">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(440px,620px)] lg:items-center">
-          <div>
-            <WordReveal
-              className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-5xl"
-              tokens={["Security", "that", { w: "sees", accent: true }, "\n", "every", "attack", "chain."]}
-            />
-            <motion.p
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ delay: 0.18, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-8 max-w-xl text-text-secondary leading-relaxed"
-            >
-              Adversarial reasoning across eight layers — modeling how a web injection feeds an LLM that
-              poisons a RAG corpus that hijacks an agent.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ delay: 0.28, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-10 flex flex-wrap items-center gap-5"
-            >
-              <button onClick={onEnter}
-                className="group flex items-center gap-3 px-7 py-4 rounded-full bg-accent text-[rgb(var(--accent-contrast))] font-medium tracking-wide hover:opacity-90 transition-all">
-                DISCOVER ARGUS <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
-              </button>
-              <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted whitespace-nowrap">OR SCROLL DOWN</span>
-            </motion.div>
-          </div>
-
-          <Reveal delay={0.1}>
-            <LiveAttackChain />
-          </Reveal>
-        </div>
-      </section>
 
       {/* ── PROBLEM BAND (normal-flow, copy staggers in on enter) ── */}
       <ProblemBand />
@@ -294,7 +259,7 @@ export function Landing({ onEnter }: Props) {
       <section className="relative py-9 border-y border-line/10 bg-surface/40">
         <p className="text-center text-text-muted text-xs font-mono uppercase tracking-[0.25em] mb-6">Eight layers · one campaign</p>
         <div className="marquee-mask overflow-hidden">
-          <div className="marquee-track gap-4">
+          <div className="marquee-track">
             {[...LAYERS, ...LAYERS].map((l, i) => (
               <div key={i} className="flex items-center gap-3 px-6 py-3 rounded-xl border border-line/15 bg-surface shrink-0">
                 <div className="w-9 h-9 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center"><l.Icon className="w-5 h-5 text-accent" /></div>
@@ -400,8 +365,8 @@ export function Landing({ onEnter }: Props) {
           <h2 className="mt-5 font-serif-display text-4xl md:text-6xl max-w-3xl">Why siloed tools miss the real risk.</h2>
         </Reveal>
         <Reveal delay={0.1}>
-          <div className="mt-12 max-w-4xl border border-line/15 rounded-2xl overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="mt-12 max-w-4xl border border-line/15 rounded-2xl overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="border-b border-line/15 text-text-muted font-mono text-xs">
                   <th className="text-left px-5 py-4 font-normal">Tool</th>

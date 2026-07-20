@@ -241,8 +241,11 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 .toast-exit  { animation: slide-out 0.3s ease forwards; }
 
 /* ── Infinite marquee (8-layer strip) ──────────── */
+/* Items space themselves with margin (not flex gap) so the duplicated list is
+   exactly half the track width and the -50% loop point is seamless. */
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.marquee-track { display: flex; width: max-content; animation: marquee 32s linear infinite; }
+.marquee-track { display: flex; width: max-content; animation: marquee 32s linear infinite; will-change: transform; }
+.marquee-track > * { margin-right: 1rem; }
 .marquee-track:hover { animation-play-state: paused; }
 .marquee-mask {
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
@@ -291,18 +294,14 @@ input[type=range] { accent-color: rgb(var(--accent)); }
   -webkit-background-clip: text;
   background-clip: text;
 }
-@keyframes halftone-shift { from { background-position: 0 0; } to { background-position: 14px 0; } }
-.halftone-text { animation: halftone-shift 8s linear infinite; }
-
-/* Halftone "breathing" — opacity pulse only. We deliberately avoid animating
-   background-size or filter:drop-shadow here: both force a full repaint of the
-   giant 24vw text every frame, which is the main cause of scroll jank. Opacity
-   is GPU-composited and cheap. */
+/* Halftone "breathing" — opacity pulse only. Animating background-position,
+   background-size, or filter on the giant clipped text forces a full repaint
+   of ~19rem glyphs every frame; opacity is GPU-composited and cheap. */
 @keyframes halftone-breathe {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.82; }
 }
-.halftone-breathe { animation: halftone-shift 8s linear infinite, halftone-breathe 7s ease-in-out infinite; }
+.halftone-breathe { animation: halftone-breathe 7s ease-in-out infinite; }
 
 /* Per-letter rise used by the JS-split headline */
 @keyframes letter-rise { from { transform: translateY(110%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -320,7 +319,8 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .landing-scroll-container { scroll-behavior: auto; }
-  .halftone-text, .halftone-breathe, .aurora, .ascii-hero { animation: none !important; }
+  .halftone-text, .halftone-breathe, .aurora, .ascii-hero,
+  .marquee-track, .system-radar-sweep { animation: none !important; }
 }
 
 /* Animated aurora background for the landing hero */
@@ -366,10 +366,10 @@ input[type=range] { accent-color: rgb(var(--accent)); }
 /* Dither-pixel reveal for the second word */
 @keyframes dither-in { from { opacity: 0; } to { opacity: 1; } }
 
-/* Mode-reactive accent: Landing overrides --accent/--glow inline; this just
-   makes the transition smooth as the user hovers Basic / Advanced. */
-.accent-reactive,
-.accent-reactive * { transition: color .5s ease, background-color .5s ease, border-color .5s ease, box-shadow .5s ease; }
+/* Mode-reactive accent: Landing overrides --accent/--glow inline. Only the
+   root transitions — a universal `*` transition here forced style recalcs on
+   every element during scroll and was a major source of jank. */
+.accent-reactive { transition: color .5s ease, background-color .5s ease; }
 
 /* ARGUS motion system */
 @keyframes argus-grid-drift {
