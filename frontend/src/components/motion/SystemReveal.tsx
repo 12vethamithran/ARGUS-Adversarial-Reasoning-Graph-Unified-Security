@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Bot, Crosshair, GitBranch, Radar, ShieldCheck } from "lucide-react";
 import { LiveDot } from "./ArgusMotion";
@@ -10,8 +11,41 @@ const FEATURES = [
 
 const TELEMETRY = ["Web", "LLM", "RAG", "MCP", "Network", "Identity"];
 
+// Rotating status line — keeps the hero reading as a live system rather than a
+// static headline. Lines are cosmetic; they mirror the reasoning stages.
+const FEED = [
+  "8-layer reasoning mesh online",
+  "L1 → L2 injection channel confirmed",
+  "L3 corpus displacement +0.42",
+  "L4 sink tool reachable · no auth",
+  "L7 mesh infection rate 61%",
+  "Chain priority recomputed · 0.91",
+];
+
+function useSignalFeed(paused: boolean) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (paused) return;
+    const id = setInterval(() => setI((n) => (n + 1) % FEED.length), 3200);
+    return () => clearInterval(id);
+  }, [paused]);
+  return FEED[i];
+}
+
+function useSignalCount(paused: boolean) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (paused) return;
+    const id = setInterval(() => setN((v) => v + 1 + Math.floor(Math.random() * 4)), 900);
+    return () => clearInterval(id);
+  }, [paused]);
+  return String(n).padStart(4, "0");
+}
+
 export function SystemReveal() {
   const reducedMotion = useReducedMotion();
+  const feed = useSignalFeed(!!reducedMotion);
+  const count = useSignalCount(!!reducedMotion);
 
   return (
     <div className="relative overflow-hidden">
@@ -34,7 +68,7 @@ export function SystemReveal() {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono uppercase tracking-[0.22em]"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono uppercase tracking-[0.22em] whitespace-nowrap"
         >
           <LiveDot active={!reducedMotion} />
           Live system reveal
@@ -47,15 +81,27 @@ export function SystemReveal() {
             animate={reducedMotion ? undefined : { opacity: [0.25, 0.7, 0.25], scaleX: [0.9, 1.05, 0.9] }}
             transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
           />
-          <div className="overflow-hidden">
+          {/* The wordmark now opens on a centre seam — the same "heal" gesture the
+              page uses on scroll — with an accent light sweeping out of the split. */}
+          <div className="relative overflow-hidden">
             <motion.h1
-              initial={{ y: "105%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+              initial={reducedMotion ? false : { clipPath: "inset(0 50% 0 50%)" }}
+              animate={{ clipPath: "inset(0 0% 0 0%)" }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
               className="halftone-text halftone-breathe text-[clamp(5.5rem,19vw,19rem)] leading-[0.78]"
             >
               ARGUS
             </motion.h1>
+            {!reducedMotion && (
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{ background: "linear-gradient(90deg,transparent 48%,rgb(var(--accent)/0.9) 50%,transparent 52%)" }}
+                initial={{ scaleX: 0, opacity: 0 }}
+                animate={{ scaleX: 1, opacity: [0, 1, 0] }}
+                transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+              />
+            )}
           </div>
           <motion.div
             className="mt-5 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.22em] text-text-muted"
@@ -66,10 +112,14 @@ export function SystemReveal() {
             <Bot className="h-4 w-4 text-accent" />
             Adversarial Reasoning Graph Unified Security
           </motion.div>
-          <div className="mt-5 flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.18em] text-text-muted">
+          <div className="mt-5 flex flex-wrap items-center gap-3 font-mono text-[9px] uppercase tracking-[0.18em] text-text-muted">
             <span className="text-accent">Signal acquired</span>
             <span className="h-px w-16 bg-accent/35" />
-            <motion.span animate={reducedMotion ? undefined : { opacity: [0.35, 1, 0.35] }} transition={{ duration: 2.2, repeat: Infinity }}>8-layer reasoning mesh online</motion.span>
+            <motion.span key={feed} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
+              {feed}
+            </motion.span>
+            <span className="hidden h-px max-w-[120px] flex-1 bg-line/10 sm:block" />
+            <span className="text-accent">{count} signals correlated</span>
           </div>
 
           <motion.div

@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
+import { useEffect, useState, type CSSProperties } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Globe, Bot, Database, Wrench, Radar, Package, Users, KeyRound,
   ArrowRight, ArrowDown, GraduationCap, Crosshair, Check, X,
 } from "lucide-react";
 import { LiveAttackChain } from "../components/motion/LiveAttackChain";
 import { SystemReveal } from "../components/motion/SystemReveal";
+import { HealReveal } from "../components/motion/HealReveal";
 
 const ACCENTS = {
   neutral:  { a: "255 61 18", s: "217 45 10" },   // Furo orange-red
@@ -94,7 +95,7 @@ const PROBLEM_LINES = [
 function ProblemBand() {
   return (
     <section className="landing-slide cv-section relative px-6 md:px-10 py-28 md:py-36 border-t border-line/10 max-w-[1600px] mx-auto">
-      <SlideIn>
+      <HealReveal>
       <Reveal>
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-accent text-xs font-mono tracking-wide mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
@@ -125,7 +126,7 @@ function ProblemBand() {
           ))}
         </div>
       </div>
-      </SlideIn>
+      </HealReveal>
     </section>
   );
 }
@@ -151,46 +152,6 @@ function DriftParticles() {
           </motion.span>
         ))}
       </motion.div>
-    </motion.div>
-  );
-}
-
-// Scroll-linked sideways slide: as the wrapped block scrolls into view it
-// translates in horizontally (dir = 1 from the right, -1 from the left),
-// eased through a spring so it glides rather than tracking 1:1. Progress is
-// driven by a scroll listener on the app scroll container (found via
-// closest(), since the container ref isn't attached when child effects run).
-function SlideIn({ children, dir = 1, className }: { children: React.ReactNode; dir?: 1 | -1; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const reducedMotion = useReducedMotion();
-  const progress = useMotionValue(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || reducedMotion) return;
-    const scroller = el.closest(".landing-scroll-container") as HTMLElement | null;
-    const update = () => {
-      const vh = scroller ? scroller.clientHeight : window.innerHeight;
-      const top = el.getBoundingClientRect().top;
-      // 0 while the block's top is below the viewport, 1 once it reaches 45% height
-      const p = (vh - top) / (vh * 0.55);
-      progress.set(Math.min(1, Math.max(0, p)));
-    };
-    update();
-    const target: HTMLElement | Window = scroller ?? window;
-    target.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      target.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, [progress, reducedMotion]);
-  const eased = useSpring(progress, { stiffness: 110, damping: 24, mass: 0.4 });
-  const x = useTransform(eased, [0, 1], [`${dir * 34}%`, "0%"]);
-  const opacity = useTransform(eased, [0, 0.9], [0, 1]);
-  if (reducedMotion) return <div className={className}>{children}</div>;
-  return (
-    <motion.div ref={ref} className={className} style={{ x, opacity, willChange: "transform" }}>
-      {children}
     </motion.div>
   );
 }
@@ -229,8 +190,9 @@ function ChainHero({ onEnter }: Props) {
         initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true, amount: 0.15 }}
         transition={{ duration: 1.15, ease: [0.16, 1, 0.3, 1] }} style={{ transformOrigin: "left" }} />
       <div className="relative z-10 grid min-w-0 w-full max-w-[1600px] mx-auto gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(480px,680px)] lg:items-center">
-        <motion.div className="min-w-0" initial={reducedMotion ? false : { opacity: 0, y: 44 }} whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}>
+        {/* Left column heals open from the left, right column from the right —
+            the two halves meet on the seam down the middle of the hero. */}
+        <HealReveal dir={1} className="min-w-0">
           <WordReveal className="font-serif-display text-5xl md:text-8xl leading-[0.95] max-w-5xl"
             tokens={["Security", "that", { w: "sees", accent: true }, "\n", "every", "attack", "chain."]} />
           <motion.p initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }}
@@ -244,11 +206,13 @@ function ChainHero({ onEnter }: Props) {
             </button>
             <span className="font-mono text-[11px] tracking-[0.25em] text-text-muted whitespace-nowrap">SCROLL TO TRACE THE SIGNAL</span>
           </motion.div>
-        </motion.div>
-        <motion.div className="chain-motion-box min-w-0 max-w-full" initial={reducedMotion ? false : { opacity: 0, y: 56, scale: 0.97 }} whileInView={{ opacity: 1, y: 0, scale: 1 }}
-          viewport={{ once: true, amount: 0.18 }} transition={{ duration: 1, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}>
-          <LiveAttackChain />
-        </motion.div>
+        </HealReveal>
+        <HealReveal dir={-1} className="chain-motion-box min-w-0 max-w-full">
+          <motion.div initial={reducedMotion ? false : { scale: 0.97 }} whileInView={{ scale: 1 }}
+            viewport={{ once: true, amount: 0.18 }} transition={{ duration: 1, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}>
+            <LiveAttackChain />
+          </motion.div>
+        </HealReveal>
       </div>
     </section>
   );
@@ -299,7 +263,7 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── MARQUEE ── */}
       <section className="landing-slide relative py-9 border-y border-line/10 bg-surface/40">
-        <SlideIn dir={-1}>
+        <HealReveal dir={-1}>
         <p className="text-center text-text-muted text-xs font-mono uppercase tracking-[0.25em] mb-6">Eight layers · one campaign</p>
         <div className="marquee-mask overflow-hidden">
           <div className="marquee-track">
@@ -312,7 +276,7 @@ export function Landing({ onEnter }: Props) {
             ))}
           </div>
         </div>
-        </SlideIn>
+        </HealReveal>
       </section>
 
       {/* ── LAYERS (big serif-italic title + grid) ── */}
@@ -357,14 +321,14 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── STATS BAND ── */}
       <section className="landing-slide cv-section relative px-6 md:px-10 py-20 border-y border-line/10 bg-surface/30">
-        <SlideIn dir={-1} className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
+        <HealReveal dir={-1} className="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
           {STATS.map((s, i) => (
             <Reveal key={s.l} delay={i * 0.06} className="text-center">
               <p className="font-serif-display text-6xl md:text-8xl leading-none text-accent">{s.v}</p>
               <p className="text-text-muted text-sm mt-3">{s.l}</p>
             </Reveal>
           ))}
-        </SlideIn>
+        </HealReveal>
       </section>
 
       {/* ── ATTACK-CHAIN SHOWCASE ── */}
@@ -450,7 +414,8 @@ export function Landing({ onEnter }: Props) {
 
       {/* ── CTA ── */}
       <section className="landing-slide cv-section relative px-6 md:px-10 py-32 text-center border-t border-line/10">
-        <SlideIn>
+        {/* dir 0 → heals open outward from the centre seam, which suits a centred block */}
+        <HealReveal dir={0}>
         <Reveal>
           <h2 className="font-serif-display text-5xl md:text-8xl leading-[1.02] mb-10">
             Reason about your<br /><span className="serif-italic">attack surface.</span>
@@ -461,7 +426,7 @@ export function Landing({ onEnter }: Props) {
           </button>
           <p className="text-text-muted text-sm mt-8 font-mono">Only test targets you own or are authorized to assess.</p>
         </Reveal>
-        </SlideIn>
+        </HealReveal>
       </section>
 
       {/* ── FOOTER ── */}
@@ -475,10 +440,10 @@ export function Landing({ onEnter }: Props) {
   );
 }
 
-function Section({ children, id, dir = 1 }: { children: React.ReactNode; id?: string; dir?: 1 | -1 }) {
+function Section({ children, id, dir = 1 }: { children: React.ReactNode; id?: string; dir?: 1 | -1 | 0 }) {
   return (
     <section id={id} className="landing-slide cv-section relative px-6 md:px-10 py-24 md:py-32 max-w-[1600px] mx-auto">
-      <SlideIn dir={dir}>{children}</SlideIn>
+      <HealReveal dir={dir}>{children}</HealReveal>
     </section>
   );
 }
